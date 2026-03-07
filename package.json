@@ -1,5 +1,5 @@
 {
-  "name": "ask-aatm",
+  "name": "ask-aagam",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.19.0",
+    "firebase": "^12.10.0",
+    "firebase-admin": "^13.7.0",
+    "idb": "^8.0.3",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3"
