@@ -91,11 +91,13 @@ export default function ReaderView({
       <div className="flex-1 relative bg-gray-100">
         {pdfUrl && (
           <>
-            <iframe 
-              src={pdfUrl} 
+            <object 
+              data={pdfUrl} 
+              type="application/pdf"
               className="absolute inset-0 w-full h-full" 
-              title="PDF Viewer"
-            />
+            >
+              <p className="flex items-center justify-center h-full text-gray-500">Unable to display PDF. Please use the Download or Fullscreen button.</p>
+            </object>
           </>
         )}
       </div>

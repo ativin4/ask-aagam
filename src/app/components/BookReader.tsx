@@ -18,16 +18,25 @@ export default function BookReader() {
 
   useEffect(() => {
     const fetchLibrary = async () => {
-        try {
-        const res = await fetch("/api/books");
-        if (res.ok) {
-            const data = await res.json();
-            setAvailableBooks(data.books);
+        // 1. Try loading from local storage first for offline support
+        const cached = localStorage.getItem("book_library_cache");
+        if (cached) {
+            setAvailableBooks(JSON.parse(cached));
+            setIsLoadingLibrary(false);
         }
+
+        try {
+            const res = await fetch("/api/books");
+            if (res.ok) {
+                const data = await res.json();
+                setAvailableBooks(data.books);
+                // 2. Update cache with fresh data
+                localStorage.setItem("book_library_cache", JSON.stringify(data.books));
+            }
         } catch (error) {
-        console.error("Failed to load library", error);
+            console.error("Failed to load library", error);
         } finally {
-        setIsLoadingLibrary(false);
+            setIsLoadingLibrary(false);
         }
     };
 

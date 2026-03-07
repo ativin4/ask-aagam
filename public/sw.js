@@ -39,7 +39,12 @@ self.addEventListener('activate', (event) => {
 // 3. Fetch Event: Intercept network requests
 self.addEventListener('fetch', (event) => {
   // We only want to handle GET requests for our Cache API
-  if (event.request.method!== 'GET') return;
+  if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+
+  // Exclude API calls from SW caching (handled by app logic)
+  if (url.pathname.startsWith('/api/')) return;
 
   event.respondWith(
     // Cache-First Strategy: Check if it's in the cache first
@@ -50,8 +55,13 @@ self.addEventListener('fetch', (event) => {
 
       // If not in cache, try fetching from the network
       return fetch(event.request).then((networkResponse) => {
-        // Optional: Dynamically cache new static assets as the user browses
-        // (Be careful not to dynamically cache massive API JSON responses here; use IndexedDB for that)
+        // Cache valid responses for static assets
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
         return networkResponse;
       }).catch(() => {
         // If the network fails and it's not in the cache, you can return a custom offline page
