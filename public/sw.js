@@ -1,74 +1,88 @@
 const CACHE_NAME = 'ask-aagam-cache-v1';
+const URLS_TO_CACHE = ["/"];
 
-// 1. Install Event: Cache your static app shell
+// --- Lifecycle Events ---
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      // Add the core URLs you want to be available offline immediately
-      return cache.addAll([
-        '/',
-        '/manifest.json',
-        '/ask-aagam.png',
-        // Add offline fallback page if you create one
-        // '/offline' 
-      ]);
-    })
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.addAll(URLS_TO_CACHE);
+      return self.skipWaiting();
+    })()
   );
-  // Force the waiting service worker to become the active service worker
-  self.skipWaiting();
 });
 
-// 2. Activate Event: Clean up old caches when you update your app
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName!== CACHE_NAME) {
-            console.log('Service Worker: Clearing Old Cache');
-            return caches.delete(cacheName);
-          }
-        })
+    (async () => {
+      // Clean up old caches
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
       );
-    })
+      // Take control of all pages immediately
+      return self.clients.claim();
+    })()
   );
-  // Ensure the service worker takes control of the page immediately
-  self.clients.claim();
 });
 
-// 3. Fetch Event: Intercept network requests
-self.addEventListener('fetch', (event) => {
-  // We only want to handle GET requests for our Cache API
-  if (event.request.method !== 'GET') return;
+// --- Helper Functions ---
 
-  const url = new URL(event.request.url);
+const putInCache = async (request, response) => {
+  // Only cache successful or opaque (cross-origin) responses
+  if (response.status === 200 || response.status === 0) {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response);
+  }
+};
 
-  // Exclude API calls from SW caching (handled by app logic)
-  if (url.pathname.startsWith('/api/')) return;
+const cacheFirst = async ({ request, fallbackUrl }) => {
+  // 1. Try to find the resource in the cache
+  const responseFromCache = await caches.match(request);
+  if (responseFromCache) return responseFromCache;
+
+  // 2. If not in cache, try the network
+  try {
+    const responseFromNetwork = await fetch(request);
+    
+    // 3. Save a clone of the network response to the cache
+    // This covers your Next.js static files and general GET requests
+    putInCache(request, responseFromNetwork.clone());
+    
+    return responseFromNetwork;
+  } catch (error) {
+    // 4. If network fails and it's a page navigation, show the fallback (root)
+    if (request.mode === 'navigate') {
+      const fallbackResponse = await caches.match(fallbackUrl);
+      if (fallbackResponse) return fallbackResponse;
+    }
+
+    // 5. Generic error response
+    return new Response("Network error happened", {
+      status: 408,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+};
+
+// --- Fetch Interceptor ---
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Skip non-GET requests and API calls
+  if (request.method !== 'GET' || url.pathname.startsWith('/api/')) {
+    return;
+  }
 
   event.respondWith(
-    // Cache-First Strategy: Check if it's in the cache first
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      // If not in cache, try fetching from the network
-      return fetch(event.request).then((networkResponse) => {
-        // Cache valid responses for static assets
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        // If the network fails and it's not in the cache, you can return a custom offline page
-        if (event.request.mode === 'navigate') {
-          return caches.match('/'); // Or caches.match('/offline')
-        }
-      });
+    cacheFirst({
+      request,
+      fallbackUrl: "/",
     })
   );
 });

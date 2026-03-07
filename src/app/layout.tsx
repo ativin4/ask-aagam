@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Ask Aagam",
   description: "For reading and understanding jain scriptures",
+  manifest: "/manifest.json",
   icons: {
     icon: "/ask-aagam.png",
   },
