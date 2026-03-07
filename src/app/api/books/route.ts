@@ -47,7 +47,7 @@ export async function GET() {
       });
 
     return NextResponse.json({ books });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error listing books:", error);
     return NextResponse.json({ error: "Failed to fetch book list" }, { status: 500 });
   }
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     }));
 
     return NextResponse.json({ signedUrls });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating signed URLs:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

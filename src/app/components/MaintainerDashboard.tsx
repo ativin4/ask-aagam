@@ -44,7 +44,7 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
 
         // 2. Upload the files directly to GCS using the Signed URLs
         await Promise.all(uploadFiles.map(async (file) => {
-            const target = signedUrls.find((t: any) => t.fileName === file.name);
+            const target = signedUrls.find((t: { fileName: string; signedUrl: string }) => t.fileName === file.name);
             if (!target) return;
 
             const uploadResponse = await fetch(target.signedUrl, {
@@ -61,9 +61,9 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
         setUploadStatus("Uploads complete! Books are now in the library pipeline.");
         setUploadFiles([]); // Clear input
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(error);
-        setUploadStatus(`Error: ${error.message}`);
+        setUploadStatus(`Error: ${(error as Error).message}`);
     }
     };
 
@@ -94,8 +94,8 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
 
       setAdminStatus(data.message);
       setTargetEmail(""); // clear input
-    } catch (error: any) {
-      setAdminStatus(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      setAdminStatus(`Error: ${(error as Error).message}`);
     }
   };
 

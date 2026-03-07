@@ -4,7 +4,11 @@ import * as admin from "firebase-admin";
 // Prevent re-initialization in development
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(require("@/service-account.json")),
+    credential: admin.credential.cert({
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      clientEmail: process.env.NEXT_FILE_UPLOAD_CLIENT_EMAIL,
+      privateKey: process.env.NEXT_FILE_UPLOAD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
   });
 }
 
@@ -37,8 +41,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ message: `Successfully made ${email} a maintainer.` });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error making maintainer:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: (error as Error).message || "Internal Server Error" }, { status: 500 });
   }
 }
