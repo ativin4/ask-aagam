@@ -1,6 +1,6 @@
 [
   {
-    "origin": ["http://localhost:3000", "https://pwa-aagam-app-jplyr5tgza-uc.a.run.app"],
+    "origin": ["http://localhost:3000", "https://pwa-aagam-app-jplyr5tgza-uc.a.run.app", "https://ask-aagam.vercel.app/"],
     "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     "responseHeader": ["Content-Type"],
     "maxAgeSeconds": 3600
