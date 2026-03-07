@@ -51,14 +51,14 @@ export default function BookListTable({
                   {offlineBookIds.has(book.id) ? (
                     <button
                       onClick={() => onDeleteOffline(book)}
-                      className="text-red-600 hover:text-red-900 font-medium"
+                      className="text-red-600 hover:text-red-900 font-medium inline-block w-32 text-center"
                     >
                       Delete Offline
                     </button>
                   ) : (
                     <button
                       onClick={() => onSaveOffline(book)}
-                      className="text-blue-600 hover:text-blue-900 font-medium"
+                      className="text-blue-600 hover:text-blue-900 font-medium inline-block w-32 text-center"
                     >
                       Save Offline
                     </button>

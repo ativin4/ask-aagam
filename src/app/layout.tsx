@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Ask Aagam",
   description: "For reading and understanding jain scriptures",
+  icons: {
+    icon: "/ask-aagam.png",
+  },
 };
 
 export default function RootLayout({
