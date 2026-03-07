@@ -31,7 +31,7 @@ jobs:
         with:
           service: pwa-aagam-app
           region: us-central1
-          source:.
+          source: .
           flags: '--allow-unauthenticated'
           env_vars: |
             NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
