@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   icons: {
     icon: "/ask-aagam.png",
+    apple: [
+        { url: '/ask-aagam.png', sizes: '180x180', type: 'image/png' },
+      ],
   },
 };
 

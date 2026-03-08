@@ -129,18 +129,18 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
         <h3 className="font-semibold text-gray-700 mb-2">Promote a User</h3>
         <p className="text-sm text-gray-500 mb-4">Grant another registered user maintainer privileges by entering their email address.</p>
         
-        <form onSubmit={handleMakeMaintainer} className="flex gap-4">
+        <form onSubmit={handleMakeMaintainer} className="flex flex-col sm:flex-row gap-4">
           <input 
             type="email" 
             placeholder="user@example.com" 
             value={targetEmail}
             onChange={(e) => setTargetEmail(e.target.value)}
-            className="border border-gray-300 p-2 rounded w-64"
+            className="border border-gray-300 p-2 rounded w-full sm:w-64 text-gray-900 bg-white"
             required
           />
           <button 
             type="submit" 
-            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition"
+            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition w-full sm:w-auto"
           >
             Make Maintainer
           </button>

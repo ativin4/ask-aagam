@@ -53,7 +53,7 @@ const cacheFirst = async ({ request, fallbackUrl }) => {
     putInCache(request, responseFromNetwork.clone());
     
     return responseFromNetwork;
-  } catch (error) {
+  } catch {
     // 4. If network fails and it's a page navigation, show the fallback (root)
     if (request.mode === 'navigate') {
       const fallbackResponse = await caches.match(fallbackUrl);

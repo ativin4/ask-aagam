@@ -6,6 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: 'Askaagam',
     description: 'An offline-capable AI book reader',
     start_url: '/',
+    scope: '/',
     display: 'standalone',
     background_color: '#ffffff',
     theme_color: '#000000',
@@ -14,6 +15,7 @@ export default function manifest(): MetadataRoute.Manifest {
         src: '/ask-aagam.png',
         sizes: '192x192',
         type: 'image/png',
+        purpose: 'maskable',
       },
       {
         src: '/ask-aagam.png',

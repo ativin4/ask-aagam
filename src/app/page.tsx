@@ -23,10 +23,10 @@ export default function Home() {
     });
 
     // Check if running on iOS and not in standalone mode
-    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream: unknown }).MSStream;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     if (isIos && !isStandalone) {
-      setShowIosHint(true);
+      setTimeout(() => setShowIosHint(true), 0);
     }
 
     return () => unsubscribe();
