@@ -99,26 +99,6 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
     }
   };
 
-  const handleSync = async () => {
-    if (!user) return;
-    setUploadStatus("Syncing library with storage...");
-    try {
-      const token = await user.getIdToken();
-      const response = await fetch("/api/sync-scriptures", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-      
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Sync failed");
-      setUploadStatus(data.message);
-    } catch (error: unknown) {
-      setUploadStatus(`Error: ${(error as Error).message}`);
-    }
-  };
-
   return (
     <div className="mb-8 p-6 bg-yellow-50 border border-yellow-200 rounded">
       <h2 className="text-xl font-bold text-yellow-800 mb-4">Maintainer Dashboard</h2>
@@ -141,15 +121,6 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
             className="bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded shadow transition"
             >
             Upload
-            </button>
-        </div>
-        
-        <div className="mt-4 pt-4 border-t border-gray-100">
-            <button 
-              onClick={handleSync}
-              className="text-sm text-gray-600 hover:text-gray-900 underline"
-            >
-              Sync Library from Storage (Fix missing scriptures)
             </button>
         </div>
         {uploadStatus && <p className="mt-3 text-sm font-medium text-blue-700">{uploadStatus}</p>}

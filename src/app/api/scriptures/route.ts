@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import * as admin from "firebase-admin";
 import { Storage } from "@google-cloud/storage";
+import { getFirestore } from "firebase-admin/firestore";
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
@@ -14,6 +15,7 @@ if (!admin.apps.length) {
 }
 
 // Initialize GCS
+const db = getFirestore();
 const storage = new Storage({
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   credentials: {
@@ -29,22 +31,12 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // Fetch all files in the bucket
-    const [files] = await bucket.getFiles();
-    
-    const scriptures = files
-      // Filter out folder placeholders (ending in /)
-      .filter(file => !file.name.endsWith('/'))
-      .map(file => {
-        // Clean up the title: remove 'uploads/' prefix and timestamp if present
-        const title = file.name.replace(/^uploads\//, '').replace(/^\d+-/, '');
-        
-        return {
-          id: file.name,
-          title: title,
-          url: `https://storage.googleapis.com/${bucketName}/${file.name}`
-        };
-      });
+    // Fetch scriptures from Firestore
+    const snapshot = await db.collection('scriptures').orderBy('createdAt', 'desc').get();
+    const scriptures = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
     return NextResponse.json({ scriptures });
   } catch (error: unknown) {
@@ -77,7 +69,8 @@ export async function POST(request: Request) {
     const signedUrls = await Promise.all(files.map(async (fileMeta: { fileName: string, fileType: string }) => {
         const { fileName, fileType } = fileMeta;
         // We store raw uploads in an "uploads" folder to process them later in the AI pipeline
-        const file = bucket.file(`uploads/${Date.now()}-${fileName}`);
+        const storagePath = `uploads/${Date.now()}-${fileName}`;
+        const file = bucket.file(storagePath);
 
         // Generate a Signed URL valid for 15 minutes
         const [signedUrl] = await file.getSignedUrl({
@@ -87,7 +80,21 @@ export async function POST(request: Request) {
             contentType: fileType,
         });
         
-        return { fileName, signedUrl, storagePath: file.name };
+        // Add to Firestore
+        const title = fileName.replace(/\.[^/.]+$/, "");
+        const url = `https://storage.googleapis.com/${bucketName}/${storagePath}`;
+
+        await db.collection('scriptures').add({
+            title,
+            url,
+            gcsPath: storagePath,
+            categories: [],
+            writer: '',
+            description: '',
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        return { fileName, signedUrl, storagePath };
     }));
 
     return NextResponse.json({ signedUrls });
