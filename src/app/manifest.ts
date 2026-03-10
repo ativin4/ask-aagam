@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Ask-aagam',
     short_name: 'Askaagam',
-    description: 'An offline-capable AI book reader',
+    description: 'An offline-capable AI scripture reader',
     start_url: '/',
     scope: '/',
     display: 'standalone',

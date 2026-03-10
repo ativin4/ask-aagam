@@ -30,7 +30,7 @@ export async function GET() {
     // Fetch all files in the "uploads/" directory
     const [files] = await bucket.getFiles({ prefix: 'uploads/' });
     
-    const books = files
+    const scriptures = files
       // Filter out the folder placeholder itself (if GCS returns it)
      .filter(file => file.name !== 'uploads/')
      .map(file => ({
@@ -40,10 +40,10 @@ export async function GET() {
         url: `https://storage.googleapis.com/${bucketName}/${file.name}`
       }));
 
-    return NextResponse.json({ books });
+    return NextResponse.json({ scriptures });
   } catch (error: unknown) {
-    console.error("Error listing books:", error);
-    return NextResponse.json({ error: "Failed to fetch book list" }, { status: 500 });
+    console.error("Error listing scriptures:", error);
+    return NextResponse.json({ error: "Failed to fetch scripture list" }, { status: 500 });
   }
 }
 

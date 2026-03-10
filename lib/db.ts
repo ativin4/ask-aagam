@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
-const DB_NAME = 'BookDatabase';
-const STORE_NAME = 'books';
+const DB_NAME = 'ScriptureDatabase';
+const STORE_NAME = 'scriptures';
 
 export const initDB = async () => {
   return openDB(DB_NAME, 1, {
@@ -14,22 +14,22 @@ export const initDB = async () => {
 };
 
 // Now accepts a Blob instead of a string
-export const saveBookOffline = async (book: { id: string, title: string, fileBlob: Blob }) => {
+export const saveScriptureOffline = async (scripture: { id: string, title: string, fileBlob: Blob }) => {
   const db = await initDB();
-  await db.put(STORE_NAME, book);
+  await db.put(STORE_NAME, scripture);
 };
 
-export const getBookOffline = async (id: string) => {
+export const getScriptureOffline = async (id: string) => {
   const db = await initDB();
   return db.get(STORE_NAME, id);
 };
 
-export const deleteBookOffline = async (id: string) => {
+export const deleteScriptureOffline = async (id: string) => {
   const db = await initDB();
   await db.delete(STORE_NAME, id);
 };
 
-export const getOfflineBookIds = async () => {
+export const getOfflineScriptureIds = async () => {
   const db = await initDB();
   return db.getAllKeys(STORE_NAME);
 };

@@ -1,26 +1,26 @@
-import { Book } from "./types";
+import { Scripture } from "./types";
 
-interface BookListTableProps {
-  books: Book[];
+interface ScriptureListTableProps {
+  scriptures: Scripture[];
   isLoading: boolean;
-  currentBookId: string | null;
-  offlineBookIds: Set<string>;
-  onRead: (book: Book) => void;
-  onSaveOffline: (book: Book) => void;
-  onDeleteOffline: (book: Book) => void;
-  onDownloadPdf: (book: Book) => void;
+  currentScriptureId: string | null;
+  offlineScriptureIds: Set<string>;
+  onRead: (scripture: Scripture) => void;
+  onSaveOffline: (scripture: Scripture) => void;
+  onDeleteOffline: (scripture: Scripture) => void;
+  onDownloadPdf: (scripture: Scripture) => void;
 }
 
-export default function BookListTable({
-  books,
+export default function ScriptureListTable({
+  scriptures,
   isLoading,
-  currentBookId,
-  offlineBookIds,
+  currentScriptureId,
+  offlineScriptureIds,
   onRead,
   onSaveOffline,
   onDeleteOffline,
   onDownloadPdf,
-}: BookListTableProps) {
+}: ScriptureListTableProps) {
   return (
     <div className="hidden md:block border rounded-lg overflow-hidden shadow-sm">
       <table className="min-w-full divide-y divide-gray-200">
@@ -37,34 +37,34 @@ export default function BookListTable({
                 Loading library...
               </td>
             </tr>
-          ) : books.length > 0 ? (
-            books.map((book) => (
-              <tr key={book.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{book.title}</td>
+          ) : scriptures.length > 0 ? (
+            scriptures.map((scripture) => (
+              <tr key={scripture.id}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{scripture.title}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                   <button
-                    onClick={() => onRead(book)}
-                    className={`${currentBookId === book.id ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"} font-medium`}
+                    onClick={() => onRead(scripture)}
+                    className={`${currentScriptureId === scripture.id ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"} font-medium`}
                   >
-                    {currentBookId === book.id ? "Close" : "Read"}
+                    {currentScriptureId === scripture.id ? "Close" : "Read"}
                   </button>
-                  {offlineBookIds.has(book.id) ? (
+                  {offlineScriptureIds.has(scripture.id) ? (
                     <button
-                      onClick={() => onDeleteOffline(book)}
+                      onClick={() => onDeleteOffline(scripture)}
                       className="text-red-600 hover:text-red-900 font-medium inline-block w-32 text-center"
                     >
                       Delete Offline
                     </button>
                   ) : (
                     <button
-                      onClick={() => onSaveOffline(book)}
+                      onClick={() => onSaveOffline(scripture)}
                       className="text-blue-600 hover:text-blue-900 font-medium inline-block w-32 text-center"
                     >
                       Save Offline
                     </button>
                   )}
                   <button
-                    onClick={() => onDownloadPdf(book)}
+                    onClick={() => onDownloadPdf(scripture)}
                     className="text-purple-600 hover:text-purple-900 font-medium"
                   >
                     Download PDF
@@ -74,7 +74,7 @@ export default function BookListTable({
             ))) : (
             <tr>
               <td colSpan={2} className="px-6 py-4 text-center text-sm text-gray-500">
-                No books found matching your search.
+                No scriptures found matching your search.
               </td>
             </tr>
           )}

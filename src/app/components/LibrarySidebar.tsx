@@ -1,9 +1,9 @@
 "use client";
 
-import { Book } from "./types";
-import BookListTable from "./BookListTable";
-import BookListCards from "./BookListCards";
-import CompactBookList from "./CompactBookList";
+import { Scripture } from "./types";
+import ScriptureListTable from "./ScriptureListTable";
+import ScriptureListCards from "./ScriptureListCards";
+import CompactScriptureList from "./CompactScriptureList";
 
 interface LibrarySidebarProps {
   searchTerm: string;
@@ -12,14 +12,14 @@ interface LibrarySidebarProps {
   isReading: boolean;
   isMobileListOpen: boolean;
   onToggleMobileList: () => void;
-  filteredBooks: Book[];
-  currentBookId: string | null;
-  offlineBookIds: Set<string>;
+  filteredScriptures: Scripture[];
+  currentScriptureId: string | null;
+  offlineScriptureIds: Set<string>;
   isLoadingLibrary: boolean;
-  onRead: (book: Book) => void;
-  onSaveOffline: (book: Book) => void;
-  onDeleteOffline: (book: Book) => void;
-  onDownloadPdf: (book: Book) => void;
+  onRead: (scripture: Scripture) => void;
+  onSaveOffline: (scripture: Scripture) => void;
+  onDeleteOffline: (scripture: Scripture) => void;
+  onDownloadPdf: (scripture: Scripture) => void;
 }
 
 export default function LibrarySidebar({
@@ -29,9 +29,9 @@ export default function LibrarySidebar({
   isReading,
   isMobileListOpen,
   onToggleMobileList,
-  filteredBooks,
-  currentBookId,
-  offlineBookIds,
+  filteredScriptures,
+  currentScriptureId,
+  offlineScriptureIds,
   isLoadingLibrary,
   onRead,
   onSaveOffline,
@@ -43,7 +43,7 @@ export default function LibrarySidebar({
       <div className={isReading ? "flex-none space-y-2 mb-2" : "flex flex-col gap-2"}>
         <input
           type="text"
-          placeholder="Search books..."
+          placeholder="Search scriptures..."
           className="w-full p-2 border rounded shadow-sm"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -57,35 +57,35 @@ export default function LibrarySidebar({
             onClick={onToggleMobileList}
             className="lg:hidden w-full mb-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition-colors flex justify-between items-center"
           >
-            <span>{isMobileListOpen ? "Hide Book List" : "Switch Book"}</span>
+            <span>{isMobileListOpen ? "Hide Scripture List" : "Switch Scripture"}</span>
             <span className="text-xs">{isMobileListOpen ? "▲" : "▼"}</span>
           </button>
           <div className={`flex-1 overflow-y-auto border rounded-lg bg-gray-50 shadow-inner ${isMobileListOpen ? 'block max-h-[40vh] lg:max-h-none' : 'hidden lg:block lg:max-h-none'}`}>
-            <CompactBookList
-              books={filteredBooks}
-              currentBookId={currentBookId}
-              offlineBookIds={offlineBookIds}
+            <CompactScriptureList
+              scriptures={filteredScriptures}
+              currentScriptureId={currentScriptureId}
+              offlineScriptureIds={offlineScriptureIds}
               onRead={onRead}
             />
           </div>
         </>
       ) : (
         <>
-          <BookListTable 
-            books={filteredBooks}
+          <ScriptureListTable 
+            scriptures={filteredScriptures}
             isLoading={isLoadingLibrary}
-            currentBookId={currentBookId}
-            offlineBookIds={offlineBookIds}
+            currentScriptureId={currentScriptureId}
+            offlineScriptureIds={offlineScriptureIds}
             onRead={onRead}
             onSaveOffline={onSaveOffline}
             onDeleteOffline={onDeleteOffline}
             onDownloadPdf={onDownloadPdf}
           />
-          <BookListCards 
-            books={filteredBooks}
+          <ScriptureListCards 
+            scriptures={filteredScriptures}
             isLoading={isLoadingLibrary}
-            currentBookId={currentBookId}
-            offlineBookIds={offlineBookIds}
+            currentScriptureId={currentScriptureId}
+            offlineScriptureIds={offlineScriptureIds}
             onRead={onRead}
             onSaveOffline={onSaveOffline}
             onDeleteOffline={onDeleteOffline}

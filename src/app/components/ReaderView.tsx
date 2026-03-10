@@ -1,33 +1,40 @@
 "use client";
 
-import { Book } from "./types";
+import { Scripture } from "./types";
+import { useEffect, useState } from "react";
 
 interface ReaderViewProps {
-  book: Book;
+  scripture: Scripture;
   pdfUrl: string | null;
   isOffline: boolean;
-  onDownload: (book: Book) => void;
-  onToggleOffline: (book: Book) => void;
-  onClose: (book: Book) => void;
+  onDownload: (scripture: Scripture) => void;
+  onToggleOffline: (scripture: Scripture) => void;
+  onClose: (scripture: Scripture) => void;
 }
 
 export default function ReaderView({
-  book,
+  scripture,
   pdfUrl,
   isOffline,
   onDownload,
   onToggleOffline,
   onClose,
 }: ReaderViewProps) {
+  const [isAndroid, setIsAndroid] = useState(false);
+
+  useEffect(() => {
+    setIsAndroid(/Android/i.test(navigator.userAgent));
+  }, []);
+
   return (
     <div className="flex-1 flex flex-col min-h-[500px] lg:min-h-0 bg-white rounded-lg shadow-sm border overflow-hidden">
       <div className="flex justify-between items-center p-3 border-b bg-gray-50">
         <h2 className="font-bold text-gray-800 truncate pr-4">
-          {book.title}
+          {scripture.title}
         </h2>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => onDownload(book)}
+            onClick={() => onDownload(scripture)}
             className="text-sm text-purple-600 hover:text-purple-800 font-medium px-3 py-1 rounded hover:bg-purple-50 transition border border-transparent hover:border-purple-200"
             title="Download PDF"
           >
@@ -39,7 +46,7 @@ export default function ReaderView({
             <span className="hidden lg:inline">Download</span>
           </button>
           <button
-            onClick={() => onToggleOffline(book)}
+            onClick={() => onToggleOffline(scripture)}
             className={`text-sm font-medium px-3 py-1 rounded transition border border-transparent lg:w-24 lg:text-center ${
               isOffline 
                 ? "text-red-600 hover:text-red-800 hover:bg-red-50 hover:border-red-200" 
@@ -75,7 +82,7 @@ export default function ReaderView({
             <span className="hidden lg:inline">Fullscreen</span>
           </a>
           <button 
-            onClick={() => onClose(book)} 
+            onClick={() => onClose(scripture)} 
             className="text-sm text-gray-600 hover:text-gray-800 font-medium px-3 py-1 rounded hover:bg-gray-50 transition border border-transparent hover:border-gray-200"
             title="Close"
           >
@@ -91,13 +98,31 @@ export default function ReaderView({
       <div className="flex-1 relative bg-gray-100">
         {pdfUrl && (
           <>
-            <object 
-              data={pdfUrl} 
-              type="application/pdf"
-              className="absolute inset-0 w-full h-full" 
-            >
-              <p className="flex items-center justify-center h-full text-gray-500">Unable to display PDF. Please use the Download or Fullscreen button.</p>
-            </object>
+            {isAndroid && !pdfUrl.startsWith("blob:") ? (
+              <iframe
+                src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(pdfUrl)}`}
+                className="absolute inset-0 w-full h-full border-0"
+                title="PDF Reader"
+              />
+            ) : (
+              <object 
+                data={pdfUrl} 
+                type="application/pdf"
+                className="absolute inset-0 w-full h-full" 
+              >
+                <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4 text-center">
+                  <p className="mb-2">
+                    {isAndroid ? "Offline viewing is not supported in-app on Android." : "Unable to display PDF directly."}
+                  </p>
+                  <button 
+                    onClick={() => onDownload(scripture)}
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    Download PDF to View
+                  </button>
+                </div>
+              </object>
+            )}
           </>
         )}
       </div>

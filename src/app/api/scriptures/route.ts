@@ -32,7 +32,7 @@ export async function GET() {
     // Fetch all files in the bucket
     const [files] = await bucket.getFiles();
     
-    const books = files
+    const scriptures = files
       // Filter out folder placeholders (ending in /)
       .filter(file => !file.name.endsWith('/'))
       .map(file => {
@@ -46,10 +46,10 @@ export async function GET() {
         };
       });
 
-    return NextResponse.json({ books });
+    return NextResponse.json({ scriptures });
   } catch (error: unknown) {
-    console.error("Error listing books:", error);
-    return NextResponse.json({ error: "Failed to fetch book list" }, { status: 500 });
+    console.error("Error listing scriptures:", error);
+    return NextResponse.json({ error: "Failed to fetch scripture list" }, { status: 500 });
   }
 }
 

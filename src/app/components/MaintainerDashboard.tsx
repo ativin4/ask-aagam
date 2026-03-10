@@ -26,7 +26,7 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
     try {
         const token = await user.getIdToken();
         
-        const urlResponse = await fetch("/api/books", {
+        const urlResponse = await fetch("/api/scriptures", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -58,7 +58,7 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
             if (!uploadResponse.ok) throw new Error(`Upload failed for ${file.name}`);
         }));
 
-        setUploadStatus("Uploads complete! Books are now in the library pipeline.");
+        setUploadStatus("Uploads complete! Scriptures are now in the library pipeline.");
         setUploadFiles([]); // Clear input
 
     } catch (error: unknown) {
@@ -99,6 +99,26 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
     }
   };
 
+  const handleSync = async () => {
+    if (!user) return;
+    setUploadStatus("Syncing library with storage...");
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/sync-scriptures", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Sync failed");
+      setUploadStatus(data.message);
+    } catch (error: unknown) {
+      setUploadStatus(`Error: ${(error as Error).message}`);
+    }
+  };
+
   return (
     <div className="mb-8 p-6 bg-yellow-50 border border-yellow-200 rounded">
       <h2 className="text-xl font-bold text-yellow-800 mb-4">Maintainer Dashboard</h2>
@@ -120,10 +140,19 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
             disabled={uploadFiles.length === 0}
             className="bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded shadow transition"
             >
-            Upload Books
+            Upload
             </button>
-            {uploadStatus && <p className="text-sm font-medium text-blue-700">{uploadStatus}</p>}
         </div>
+        
+        <div className="mt-4 pt-4 border-t border-gray-100">
+            <button 
+              onClick={handleSync}
+              className="text-sm text-gray-600 hover:text-gray-900 underline"
+            >
+              Sync Library from Storage (Fix missing scriptures)
+            </button>
+        </div>
+        {uploadStatus && <p className="mt-3 text-sm font-medium text-blue-700">{uploadStatus}</p>}
     </div>
       <div className="bg-white p-4 rounded shadow-sm">
         <h3 className="font-semibold text-gray-700 mb-2">Promote a User</h3>

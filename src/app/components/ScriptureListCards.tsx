@@ -1,46 +1,46 @@
-import { Book } from "./types";
+import { Scripture } from "./types";
 
-interface BookListCardsProps {
-  books: Book[];
+interface ScriptureListCardsProps {
+  scriptures: Scripture[];
   isLoading: boolean;
-  currentBookId: string | null;
-  offlineBookIds: Set<string>;
-  onRead: (book: Book) => void;
-  onSaveOffline: (book: Book) => void;
-  onDeleteOffline: (book: Book) => void;
-  onDownloadPdf: (book: Book) => void;
+  currentScriptureId: string | null;
+  offlineScriptureIds: Set<string>;
+  onRead: (scripture: Scripture) => void;
+  onSaveOffline: (scripture: Scripture) => void;
+  onDeleteOffline: (scripture: Scripture) => void;
+  onDownloadPdf: (scripture: Scripture) => void;
 }
 
-export default function BookListCards({
-  books,
+export default function ScriptureListCards({
+  scriptures,
   isLoading,
-  currentBookId,
-  offlineBookIds,
+  currentScriptureId,
+  offlineScriptureIds,
   onRead,
   onSaveOffline,
   onDeleteOffline,
   onDownloadPdf,
-}: BookListCardsProps) {
+}: ScriptureListCardsProps) {
   return (
     <div className="md:hidden space-y-3">
       {isLoading ? (
         <div className="text-center text-gray-500 py-8 border-2 border-dashed rounded-lg">
           Loading library...
         </div>
-      ) : books.length > 0 ? (
-        books.map((book) => (
-          <div key={book.id} className="bg-white border rounded-lg shadow-sm p-3 space-y-3">
-            <h3 className="font-medium text-gray-900 text-base">{book.title}</h3>
+      ) : scriptures.length > 0 ? (
+        scriptures.map((scripture) => (
+          <div key={scripture.id} className="bg-white border rounded-lg shadow-sm p-3 space-y-3">
+            <h3 className="font-medium text-gray-900 text-base">{scripture.title}</h3>
             <div className="flex gap-2">
               <button
-                onClick={() => onRead(book)}
-                className={`flex-1 py-2 px-4 ${currentBookId === book.id ? "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200" : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"} rounded-md font-medium transition-colors text-center text-sm`}
+                onClick={() => onRead(scripture)}
+                className={`flex-1 py-2 px-4 ${currentScriptureId === scripture.id ? "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200" : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"} rounded-md font-medium transition-colors text-center text-sm`}
               >
-                {currentBookId === book.id ? "Close" : "Read"}
+                {currentScriptureId === scripture.id ? "Close" : "Read"}
               </button>
-              {offlineBookIds.has(book.id) ? (
+              {offlineScriptureIds.has(scripture.id) ? (
                 <button
-                  onClick={() => onDeleteOffline(book)}
+                  onClick={() => onDeleteOffline(scripture)}
                   className="p-2 bg-red-50 text-red-700 rounded-md font-medium hover:bg-red-100 transition-colors border border-red-200"
                   title="Delete Offline"
                 >
@@ -50,7 +50,7 @@ export default function BookListCards({
                 </button>
               ) : (
                 <button
-                  onClick={() => onSaveOffline(book)}
+                  onClick={() => onSaveOffline(scripture)}
                   className="p-2 bg-blue-50 text-blue-700 rounded-md font-medium hover:bg-blue-100 transition-colors border border-blue-200"
                   title="Save Offline"
                 >
@@ -60,7 +60,7 @@ export default function BookListCards({
                 </button>
               )}
               <button
-                onClick={() => onDownloadPdf(book)}
+                onClick={() => onDownloadPdf(scripture)}
                 className="p-2 bg-purple-50 text-purple-700 rounded-md font-medium hover:bg-purple-100 transition-colors border border-purple-200"
                 title="Download PDF"
               >
@@ -72,7 +72,7 @@ export default function BookListCards({
           </div>
         ))) : (
         <div className="text-center text-gray-500 py-8 border-2 border-dashed rounded-lg">
-          No books found matching your search.
+          No scriptures found matching your search.
         </div>
       )}
     </div>
