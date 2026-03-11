@@ -20,6 +20,8 @@ interface LibrarySidebarProps {
   onSaveOffline: (scripture: Scripture) => void;
   onDeleteOffline: (scripture: Scripture) => void;
   onDownloadPdf: (scripture: Scripture) => void;
+  isMaintainer: boolean;
+  onEdit: (scripture: Scripture) => void;
 }
 
 export default function LibrarySidebar({
@@ -37,6 +39,8 @@ export default function LibrarySidebar({
   onSaveOffline,
   onDeleteOffline,
   onDownloadPdf,
+  isMaintainer,
+  onEdit,
 }: LibrarySidebarProps) {
   return (
     <div className={isReading ? "w-full lg:w-1/3 xl:w-1/4 flex flex-col min-h-0 lg:h-full" : "space-y-6"}>
@@ -80,6 +84,8 @@ export default function LibrarySidebar({
             onSaveOffline={onSaveOffline}
             onDeleteOffline={onDeleteOffline}
             onDownloadPdf={onDownloadPdf}
+            isMaintainer={isMaintainer}
+            onEdit={onEdit}
           />
           <ScriptureListCards 
             scriptures={filteredScriptures}
@@ -90,6 +96,8 @@ export default function LibrarySidebar({
             onSaveOffline={onSaveOffline}
             onDeleteOffline={onDeleteOffline}
             onDownloadPdf={onDownloadPdf}
+            isMaintainer={isMaintainer}
+            onEdit={onEdit}
           />
         </>
       )}

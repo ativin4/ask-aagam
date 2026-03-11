@@ -1,3 +1,5 @@
+"use client";
+import { useState } from "react";
 import { Scripture } from "./types";
 
 interface ScriptureListCardsProps {
@@ -9,6 +11,8 @@ interface ScriptureListCardsProps {
   onSaveOffline: (scripture: Scripture) => void;
   onDeleteOffline: (scripture: Scripture) => void;
   onDownloadPdf: (scripture: Scripture) => void;
+  isMaintainer: boolean;
+  onEdit: (scripture: Scripture) => void;
 }
 
 export default function ScriptureListCards({
@@ -20,7 +24,11 @@ export default function ScriptureListCards({
   onSaveOffline,
   onDeleteOffline,
   onDownloadPdf,
+  isMaintainer,
+  onEdit,
 }: ScriptureListCardsProps) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
   return (
     <div className="md:hidden space-y-3">
       {isLoading ? (
@@ -29,8 +37,37 @@ export default function ScriptureListCards({
         </div>
       ) : scriptures.length > 0 ? (
         scriptures.map((scripture) => (
-          <div key={scripture.id} className="bg-white border rounded-lg shadow-sm p-3 space-y-3">
-            <h3 className="font-medium text-gray-900 text-base">{scripture.title}</h3>
+          <div key={scripture.id} className="bg-white border rounded-lg shadow-sm p-3 space-y-3 relative">
+            <h3 className="font-medium text-gray-900 text-base pr-8">{scripture.title}</h3>
+            
+            {isMaintainer && (
+              <div className="absolute top-2 right-2">
+                <button
+                  onClick={() => setOpenMenuId(openMenuId === scripture.id ? null : scripture.id)}
+                  className="p-1 text-gray-500 hover:bg-gray-100 rounded-full"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" />
+                  </svg>
+                </button>
+                {openMenuId === scripture.id && (
+                  <div className="absolute right-0 z-10 mt-1 w-40 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          onEdit(scripture);
+                          setOpenMenuId(null);
+                        }}
+                        className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-2">
               <button
                 onClick={() => onRead(scripture)}

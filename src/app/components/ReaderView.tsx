@@ -2,6 +2,7 @@
 
 import { Scripture } from "./types";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 interface ReaderViewProps {
   scripture: Scripture;

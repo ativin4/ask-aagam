@@ -5,6 +5,6 @@ export interface Scripture {
   gcsPath?: string;
   categories?: string[];
   writer?: string;
-  tikas?: string[];
+  tikakar?: string[];
   description?: string;
 }

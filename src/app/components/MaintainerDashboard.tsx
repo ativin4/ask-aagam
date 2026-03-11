@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { User } from "firebase/auth";
 
 interface MaintainerDashboardProps {
@@ -12,12 +12,27 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
   const [adminStatus, setAdminStatus] = useState("");
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadStatus, setUploadStatus] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Keep the native file input in sync with React state to show correct file count
+  useEffect(() => {
+    if (fileInputRef.current) {
+      const dataTransfer = new DataTransfer();
+      uploadFiles.forEach((file) => dataTransfer.items.add(file));
+      fileInputRef.current.files = dataTransfer.files;
+    }
+  }, [uploadFiles]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-        setUploadFiles(Array.from(e.target.files));
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      setUploadFiles((prev) => [...prev, ...newFiles]);
     }
-    };
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setUploadFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
     const handleUpload = async () => {
     if (uploadFiles.length === 0 || !user) return;
@@ -109,12 +124,34 @@ export default function MaintainerDashboard({ user }: MaintainerDashboardProps) 
         
         <div className="flex flex-col gap-4 max-w-sm">
             <input 
+            ref={fileInputRef}
             type="file" 
             multiple
             accept="application/pdf"
             onChange={handleFileChange}
-            className="border border-gray-300 p-2 rounded"
+            className="border border-gray-300 p-2 rounded text-gray-900 bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
+            
+            {/* Selected Files List */}
+            {uploadFiles.length > 0 && (
+              <ul className="space-y-2 max-h-40 overflow-y-auto">
+                {uploadFiles.map((file, index) => (
+                  <li key={`${file.name}-${index}`} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm text-gray-700 border">
+                    <span className="truncate">{file.name}</span>
+                    <button
+                      onClick={() => handleRemoveFile(index)}
+                      className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                      title="Remove file"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             <button 
             onClick={handleUpload}
             disabled={uploadFiles.length === 0}

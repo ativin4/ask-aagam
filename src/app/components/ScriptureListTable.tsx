@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { Scripture } from "./types";
 
 interface ScriptureListTableProps {
@@ -9,6 +12,8 @@ interface ScriptureListTableProps {
   onSaveOffline: (scripture: Scripture) => void;
   onDeleteOffline: (scripture: Scripture) => void;
   onDownloadPdf: (scripture: Scripture) => void;
+  isMaintainer: boolean;
+  onEdit: (scripture: Scripture) => void;
 }
 
 export default function ScriptureListTable({
@@ -20,9 +25,13 @@ export default function ScriptureListTable({
   onSaveOffline,
   onDeleteOffline,
   onDownloadPdf,
+  isMaintainer,
+  onEdit,
 }: ScriptureListTableProps) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
   return (
-    <div className="hidden md:block border rounded-lg overflow-hidden shadow-sm">
+    <div className="hidden md:block border rounded-lg shadow-sm">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
@@ -69,6 +78,33 @@ export default function ScriptureListTable({
                   >
                     Download PDF
                   </button>
+                  {isMaintainer && (
+                    <div className="relative inline-block text-left">
+                      <button
+                        onClick={() => setOpenMenuId(openMenuId === scripture.id ? null : scripture.id)}
+                        className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 align-middle"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" />
+                        </svg>
+                      </button>
+                      {openMenuId === scripture.id && (
+                        <div className="absolute right-0 z-50 mt-2 w-40 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          <div className="py-1">
+                            <button
+                              onClick={() => {
+                                onEdit(scripture);
+                                setOpenMenuId(null);
+                              }}
+                              className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </td>
               </tr>
             ))) : (

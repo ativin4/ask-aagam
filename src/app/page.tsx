@@ -10,6 +10,7 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [isMaintainer, setIsMaintainer] = useState(false);
   const [showIosHint, setShowIosHint] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -20,6 +21,7 @@ export default function Home() {
       } else {
         setIsMaintainer(false);
       }
+      setAuthLoading(false);
     });
 
     // Check if running on iOS and not in standalone mode
@@ -40,8 +42,8 @@ export default function Home() {
           <p>Tap the Share button <span className="text-lg leading-none">⎋</span> and select <strong>Add to Home Screen</strong> for the best reading experience.</p>
         </div>
       )}
-      <Header user={user} isMaintainer={isMaintainer} />
-      <ScriptureReader />
+      <Header user={user} isMaintainer={isMaintainer} isLoading={authLoading} />
+      <ScriptureReader isMaintainer={isMaintainer} />
     </main>
   );
 }

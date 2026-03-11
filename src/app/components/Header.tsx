@@ -5,9 +5,10 @@ import { auth, googleProvider } from "../../../lib/firebase";
 interface HeaderProps {
   user: User | null;
   isMaintainer: boolean;
+  isLoading?: boolean;
 }
 
-export default function Header({ user, isMaintainer }: HeaderProps) {
+export default function Header({ user, isMaintainer, isLoading }: HeaderProps) {
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
@@ -24,7 +25,7 @@ export default function Header({ user, isMaintainer }: HeaderProps) {
         </Link>
       </div>
       
-      {!user ? (
+      {!isLoading && (!user ? (
         <button onClick={handleLogin} className="bg-blue-600 text-white px-4 py-2 rounded">
           Sign in with Google
         </button>
@@ -37,7 +38,7 @@ export default function Header({ user, isMaintainer }: HeaderProps) {
             Sign out
           </button>
         </div>
-      )}
+      ))}
     </div>
   );
 }
