@@ -27,7 +27,7 @@ const storage = new Storage({
 const bucketName = process.env.NEXT_PUBLIC_BUCKET_NAME!;
 const bucket = storage.bucket(bucketName);
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 export async function GET() {
   try {

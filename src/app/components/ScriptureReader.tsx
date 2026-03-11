@@ -33,7 +33,7 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
         }
 
         try {
-            const res = await fetch("/api/scriptures");
+            const res = await fetch("/api/scriptures", { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 setAvailableScriptures(data.scriptures);
