@@ -5,6 +5,7 @@ import { auth } from "../../lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 import Header from "./components/Header";
 import ScriptureReader from "./components/ScriptureReader";
+import ChatBot from "./components/ChatBot";
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
@@ -44,6 +45,7 @@ export default function Home() {
       )}
       <Header user={user} isMaintainer={isMaintainer} isLoading={authLoading} />
       <ScriptureReader isMaintainer={isMaintainer} />
+      <ChatBot />
     </main>
   );
 }

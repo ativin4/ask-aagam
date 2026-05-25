@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { auth } from "../../../lib/firebase";
 import { saveScriptureOffline, getScriptureOffline, deleteScriptureOffline, getOfflineScriptureIds } from "../../../lib/db";
-import { Scripture } from "./types";
+import { Scripture, VectorSearchResult } from "./types";
 import LibrarySidebar from "./LibrarySidebar";
 import ReaderView from "./ReaderView";
 import EditScriptureModal from "./EditScriptureModal";
@@ -22,6 +22,9 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
   const [offlineScriptureIds, setOfflineScriptureIds] = useState<Set<string>>(new Set());
   const [isMobileListOpen, setIsMobileListOpen] = useState(false);
   const [editingScripture, setEditingScripture] = useState<Scripture | null>(null);
+  const [jumpToPage, setJumpToPage] = useState<number | null>(null);
+  const [vectorResults, setVectorResults] = useState<VectorSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     const fetchLibrary = async () => {
@@ -58,7 +61,43 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
 
     fetchLibrary();
     checkOfflineScriptures();
+
+    const handleOpenScripture = (e: Event) => {
+      const { bookId, pageNumber } = (e as CustomEvent).detail;
+      setJumpToPage(pageNumber ?? null);
+      setAvailableScriptures((prev) => {
+        const scripture = prev.find((s) => s.id === bookId);
+        if (scripture) handleRead(scripture);
+        return prev;
+      });
+    };
+    window.addEventListener("openScripture", handleOpenScripture);
+    return () => window.removeEventListener("openScripture", handleOpenScripture);
     },[]);
+
+  useEffect(() => {
+    if (searchTerm.length < 3) {
+      setVectorResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: searchTerm, limit: 8 }),
+        });
+        const data = await res.json();
+        setVectorResults(data.results ?? []);
+      } catch {
+        setVectorResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const filteredScriptures = availableScriptures.filter(scripture => 
     scripture.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -186,6 +225,7 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
     setStatus(`Updated ${data.title}`);
   };
 
+
   return (
     <div className={isReading ? "flex flex-col lg:flex-row gap-6 lg:h-[80vh]" : "space-y-6"}>
       <LibrarySidebar
@@ -205,6 +245,8 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
         onDownloadPdf={handleDownloadPdf}
         isMaintainer={isMaintainer}
         onEdit={handleEdit}
+        vectorResults={vectorResults}
+        isSearching={isSearching}
       />
 
       {isReading && currentScripture && (
@@ -212,6 +254,7 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
           scripture={currentScripture}
           pdfUrl={pdfUrl}
           isOffline={offlineScriptureIds.has(currentScripture.id)}
+          jumpToPage={jumpToPage}
           onDownload={handleDownloadPdf}
           onToggleOffline={handleToggleOffline}
           onClose={handleRead}

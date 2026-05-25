@@ -1,39 +1,93 @@
 "use client";
 
 import { Scripture } from "./types";
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import TextPageReader from "./TextPageReader";
 
 interface ReaderViewProps {
   scripture: Scripture;
   pdfUrl: string | null;
   isOffline: boolean;
+  jumpToPage?: number | null;
   onDownload: (scripture: Scripture) => void;
   onToggleOffline: (scripture: Scripture) => void;
   onClose: (scripture: Scripture) => void;
 }
 
+type ViewMode = "ocr" | "pdf";
+
 export default function ReaderView({
   scripture,
   pdfUrl,
   isOffline,
+  jumpToPage,
   onDownload,
   onToggleOffline,
   onClose,
 }: ReaderViewProps) {
+  const isProcessed = scripture.status === "ready";
+  const [mounted, setMounted] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("pdf");
+  // Tracks current OCR page via ref — avoids feedback loop (no state → no re-render)
+  const ocrPageRef = useRef<number | null>(jumpToPage ?? null);
+  // PDF URL fragment — only updated when switching OCR→PDF
+  const [pdfPageFragment, setPdfPageFragment] = useState<number>(jumpToPage ?? 1);
 
   useEffect(() => {
+    setMounted(true);
     setIsAndroid(/Android/i.test(navigator.userAgent));
   }, []);
 
+  // Reset on scripture change or citation jump
+  useEffect(() => {
+    setViewMode("pdf");
+    ocrPageRef.current = jumpToPage ?? null;
+    setPdfPageFragment(jumpToPage ?? 1);
+  }, [scripture.id, jumpToPage]);
+
+  // Called by TextPageReader on every page turn — updates ref only, no re-render
+  const handlePageChange = useCallback((pageNumber: number) => {
+    ocrPageRef.current = pageNumber;
+  }, []);
+
+  // When switching modes: capture OCR page into PDF fragment at switch time
+  const handleSetViewMode = useCallback((mode: ViewMode) => {
+    if (mode === "pdf" && ocrPageRef.current) {
+      setPdfPageFragment(ocrPageRef.current);
+    }
+    setViewMode(mode);
+  }, []);
+
+  const pdfUrlAtPage = pdfUrl ? `${pdfUrl}#page=${pdfPageFragment}` : null;
+
+  const showOcr = isProcessed && viewMode === "ocr";
+  const showPdf = viewMode === "pdf";
+
   return (
     <div className="flex-1 flex flex-col min-h-[500px] lg:min-h-0 bg-white rounded-lg shadow-sm border overflow-hidden">
+      {/* Header */}
       <div className="flex justify-between items-center p-3 border-b bg-gray-50">
-        <h2 className="font-bold text-gray-800 truncate pr-4">
-          {scripture.title}
-        </h2>
+        <h2 className="font-bold text-gray-800 truncate pr-4">{scripture.title}</h2>
         <div className="flex items-center gap-2">
+          {/* OCR / PDF toggle — only when scripture has processed OCR text */}
+          {isProcessed && pdfUrl && (
+            <div className="flex rounded border overflow-hidden text-xs font-medium">
+              <button
+                onClick={() => handleSetViewMode("pdf")}
+                className={`px-2 py-1 transition ${viewMode === "pdf" ? "bg-purple-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+              >
+                PDF
+              </button>
+              <button
+                onClick={() => handleSetViewMode("ocr")}
+                className={`px-2 py-1 transition ${viewMode === "ocr" ? "bg-purple-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+              >
+                OCR
+              </button>
+            </div>
+          )}
+
           <button
             onClick={() => onDownload(scripture)}
             className="text-sm text-purple-600 hover:text-purple-800 font-medium px-3 py-1 rounded hover:bg-purple-50 transition border border-transparent hover:border-purple-200"
@@ -49,8 +103,8 @@ export default function ReaderView({
           <button
             onClick={() => onToggleOffline(scripture)}
             className={`text-sm font-medium px-3 py-1 rounded transition border border-transparent lg:w-24 lg:text-center ${
-              isOffline 
-                ? "text-red-600 hover:text-red-800 hover:bg-red-50 hover:border-red-200" 
+              isOffline
+                ? "text-red-600 hover:text-red-800 hover:bg-red-50 hover:border-red-200"
                 : "text-blue-600 hover:text-blue-800 hover:bg-blue-50 hover:border-blue-200"
             }`}
             title={isOffline ? "Remove from Offline" : "Save Offline"}
@@ -68,12 +122,12 @@ export default function ReaderView({
             </span>
             <span className="hidden lg:inline">{isOffline ? "Remove" : "Save"}</span>
           </button>
-          <a 
-            href={pdfUrl || "#"} 
-            target="_blank" 
-            rel="noopener noreferrer" 
+          <a
+            href={pdfUrl || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1 rounded hover:bg-blue-50 transition border border-transparent hover:border-blue-200 flex items-center"
-            title="Open Fullscreen"
+            title="Open in browser"
           >
             <span className="lg:hidden">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -82,8 +136,8 @@ export default function ReaderView({
             </span>
             <span className="hidden lg:inline">Fullscreen</span>
           </a>
-          <button 
-            onClick={() => onClose(scripture)} 
+          <button
+            onClick={() => onClose(scripture)}
             className="text-sm text-gray-600 hover:text-gray-800 font-medium px-3 py-1 rounded hover:bg-gray-50 transition border border-transparent hover:border-gray-200"
             title="Close"
           >
@@ -96,37 +150,73 @@ export default function ReaderView({
           </button>
         </div>
       </div>
-      <div className="flex-1 relative bg-gray-100">
-        {pdfUrl && (
-          <>
-            {isAndroid && !pdfUrl.startsWith("blob:") ? (
-              <iframe
-                src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(pdfUrl)}`}
-                className="absolute inset-0 w-full h-full border-0"
-                title="PDF Reader"
-              />
-            ) : (
-              <object 
-                data={pdfUrl} 
-                type="application/pdf"
-                className="absolute inset-0 w-full h-full" 
-              >
-                <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4 text-center">
-                  <p className="mb-2">
-                    {isAndroid ? "Offline viewing is not supported in-app on Android." : "Unable to display PDF directly."}
-                  </p>
-                  <button 
-                    onClick={() => onDownload(scripture)}
-                    className="text-blue-600 hover:underline font-medium"
-                  >
-                    Download PDF to View
-                  </button>
-                </div>
-              </object>
-            )}
-          </>
+
+      {/* Content */}
+      <div className="relative bg-gray-100 overflow-hidden h-[65dvh] lg:flex-1 lg:min-h-0">
+        {/* OCR text view — always mounted when processed so page position survives PDF↔OCR toggle */}
+        {isProcessed && (
+          <div className={`absolute inset-0 ${viewMode === "ocr" ? "block" : "hidden"}`}>
+            <TextPageReader
+              scriptureId={scripture.id}
+              jumpToPage={jumpToPage}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        )}
+
+        {/* PDF rendering — deferred until mounted (avoids SSR/client hydration mismatch) */}
+        {mounted && showPdf && pdfUrlAtPage && !isAndroid && (
+          <object
+            key={pdfUrlAtPage}
+            data={pdfUrlAtPage}
+            type="application/pdf"
+            className="absolute inset-0 w-full h-full"
+          >
+            <PdfFallback pdfUrl={pdfUrl!} onDownload={() => onDownload(scripture)} />
+          </object>
+        )}
+
+        {mounted && showPdf && isAndroid && pdfUrl && !pdfUrl.startsWith("blob:") && (
+          <iframe
+            key={pdfUrl}
+            src={`https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
+            className="absolute inset-0 w-full h-full border-0"
+            title={scripture.title}
+          />
+        )}
+        {mounted && showPdf && isAndroid && pdfUrl?.startsWith("blob:") && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center text-gray-600">
+            <p className="text-sm">Offline PDF can&apos;t be embedded on Android.</p>
+            <div className="flex flex-col gap-3 w-full max-w-xs">
+              <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 text-center">
+                Open PDF in Browser
+              </a>
+              <button onClick={() => onDownload(scripture)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">
+                Download PDF
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* No PDF available and not processed */}
+        {!isProcessed && !pdfUrl && (
+          <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+            No content available.
+          </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PdfFallback({ pdfUrl, onDownload }: { pdfUrl: string; onDownload: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4 text-center gap-3">
+      <p>Unable to display PDF in this browser.</p>
+      <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700">
+        Open PDF in Browser
+      </a>
+      <button onClick={onDownload} className="text-blue-600 hover:underline text-sm">Download PDF</button>
     </div>
   );
 }

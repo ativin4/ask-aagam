@@ -1,88 +1,122 @@
-const CACHE_NAME = 'ask-aagam-cache-v1';
-const URLS_TO_CACHE = ["/"];
+const CACHE_VERSION = 'v4';
+const APP_CACHE = `ask-aagam-app-${CACHE_VERSION}`;
+const STATIC_CACHE = `ask-aagam-static-${CACHE_VERSION}`;
 
-// --- Lifecycle Events ---
+const APP_SHELL = ['/', '/offline.html'];
 
+// ── Install: precache app shell + offline fallback ────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      await cache.addAll(URLS_TO_CACHE);
-      return self.skipWaiting();
-    })()
+    caches.open(APP_CACHE)
+      .then((cache) => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
   );
 });
 
+// ── Activate: purge old caches, claim clients ─────────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    (async () => {
-      // Clean up old caches
-      const cacheNames = await caches.keys();
-      await Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
-      );
-      // Take control of all pages immediately
-      return self.clients.claim();
-    })()
+    caches.keys()
+      .then((keys) => Promise.all(
+        keys
+          .filter((k) => k !== APP_CACHE && k !== STATIC_CACHE)
+          .map((k) => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
-// --- Helper Functions ---
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const putInCache = async (request, response) => {
-  // Only cache successful or opaque (cross-origin) responses
-  if (response.status === 200 || response.status === 0) {
-    const cache = await caches.open(CACHE_NAME);
-    await cache.put(request, response);
-  }
-};
-
-const cacheFirst = async ({ request, fallbackUrl }) => {
-  // 1. Try to find the resource in the cache
-  const responseFromCache = await caches.match(request);
-  if (responseFromCache) return responseFromCache;
-
-  // 2. If not in cache, try the network
+async function cacheFirst(request, cacheName) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
   try {
-    const responseFromNetwork = await fetch(request);
-    
-    // 3. Save a clone of the network response to the cache
-    // This covers your Next.js static files and general GET requests
-    putInCache(request, responseFromNetwork.clone());
-    
-    return responseFromNetwork;
-  } catch {
-    // 4. If network fails and it's a page navigation, show the fallback (root)
-    if (request.mode === 'navigate') {
-      const fallbackResponse = await caches.match(fallbackUrl);
-      if (fallbackResponse) return fallbackResponse;
+    const response = await fetch(request);
+    if (response.status === 200 || response.status === 0) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
     }
-
-    // 5. Generic error response
-    return new Response("Network error happened", {
-      status: 408,
-      headers: { "Content-Type": "text/plain" },
-    });
+    return response;
+  } catch {
+    return new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
   }
-};
+}
 
-// --- Fetch Interceptor ---
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(APP_CACHE);
+  const cached = await cache.match(request);
 
-self.addEventListener("fetch", (event) => {
+  // Fire network request regardless — update cache in background
+  const networkPromise = fetch(request).then((response) => {
+    if (response.status === 200) cache.put(request, response.clone());
+    return response;
+  }).catch(() => null);
+
+  if (cached) {
+    networkPromise.catch(() => {}); // suppress unhandled rejection
+    return cached;
+  }
+
+  const network = await networkPromise;
+  if (network) return network;
+
+  // Navigate requests get the offline page; other requests get plain 503
+  if (request.mode === 'navigate') {
+    const offline = await cache.match('/offline.html');
+    if (offline) return offline;
+  }
+
+  return new Response('You are offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+}
+
+// ── Fetch: route by request type ─────────────────────────────────────────────
+self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests and API calls
-  if (request.method !== 'GET' || url.pathname.startsWith('/api/')) {
+  if (request.method !== 'GET') return;
+
+  // API — always network, never cache
+  if (url.pathname.startsWith('/api/')) return;
+
+  // Next.js static chunks — immutable (content-hashed), cache forever
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(cacheFirst(request, STATIC_CACHE));
     return;
   }
 
-  event.respondWith(
-    cacheFirst({
-      request,
-      fallbackUrl: "/",
-    })
-  );
+  // Next.js image optimizer — cache first
+  if (url.pathname.startsWith('/_next/image')) {
+    event.respondWith(cacheFirst(request, STATIC_CACHE));
+    return;
+  }
+
+  // External resources (fonts, CDN) — cache first
+  if (url.origin !== self.location.origin) {
+    event.respondWith(cacheFirst(request, STATIC_CACHE));
+    return;
+  }
+
+  // App pages and public assets — stale-while-revalidate
+  event.respondWith(staleWhileRevalidate(request));
+});
+
+// ── Background Sync: retry failed non-chat requests ──────────────────────────
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'retry-failed') {
+    event.waitUntil(
+      // Clients handle their own retry logic; SW just notifies them
+      self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => client.postMessage({ type: 'SYNC_RETRY' }));
+      })
+    );
+  }
+});
+
+// ── Message: skip waiting on demand (triggered by update banner) ──────────────
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

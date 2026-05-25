@@ -62,6 +62,7 @@ export default function ScriptureListCards({
                       >
                         Edit
                       </button>
+
                     </div>
                   </div>
                 )}

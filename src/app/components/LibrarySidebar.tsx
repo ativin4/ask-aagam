@@ -1,6 +1,6 @@
 "use client";
 
-import { Scripture } from "./types";
+import { Scripture, VectorSearchResult } from "./types";
 import ScriptureListTable from "./ScriptureListTable";
 import ScriptureListCards from "./ScriptureListCards";
 import CompactScriptureList from "./CompactScriptureList";
@@ -22,6 +22,8 @@ interface LibrarySidebarProps {
   onDownloadPdf: (scripture: Scripture) => void;
   isMaintainer: boolean;
   onEdit: (scripture: Scripture) => void;
+  vectorResults: VectorSearchResult[];
+  isSearching: boolean;
 }
 
 export default function LibrarySidebar({
@@ -41,18 +43,43 @@ export default function LibrarySidebar({
   onDownloadPdf,
   isMaintainer,
   onEdit,
+  vectorResults,
+  isSearching,
 }: LibrarySidebarProps) {
+  const openAtPage = (bookId: string, pageNumber: number) => {
+    window.dispatchEvent(new CustomEvent("openScripture", { detail: { bookId, pageNumber } }));
+  };
   return (
     <div className={isReading ? "w-full lg:w-1/3 xl:w-1/4 flex flex-col min-h-0 lg:h-full" : "space-y-6"}>
       <div className={isReading ? "flex-none space-y-2 mb-2" : "flex flex-col gap-2"}>
         <input
           type="text"
-          placeholder="Search scriptures..."
+          placeholder="Search scriptures or content…"
           className="w-full p-2 border rounded shadow-sm"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
         />
         <p className="text-sm text-gray-500 min-h-[20px] truncate">{status}</p>
+
+        {/* Vector search results */}
+        {isSearching && (
+          <div className="text-xs text-gray-400 px-1">Searching content…</div>
+        )}
+        {!isSearching && vectorResults.length > 0 && (
+          <div className="border rounded-lg bg-white shadow divide-y max-h-72 overflow-y-auto">
+            <p className="text-xs font-medium text-gray-500 px-3 py-1.5 bg-gray-50">Content matches</p>
+            {vectorResults.map((r, i) => (
+              <button
+                key={i}
+                onClick={() => openAtPage(r.bookId, r.pageNumber)}
+                className="w-full text-left px-3 py-2 hover:bg-purple-50 transition-colors"
+              >
+                <div className="text-xs font-semibold text-purple-700 truncate">{r.bookTitle} · p.{r.pageNumber}</div>
+                <div className="text-xs text-gray-600 line-clamp-2 mt-0.5">{r.preview}</div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {isReading ? (
@@ -87,7 +114,7 @@ export default function LibrarySidebar({
             isMaintainer={isMaintainer}
             onEdit={onEdit}
           />
-          <ScriptureListCards 
+          <ScriptureListCards
             scriptures={filteredScriptures}
             isLoading={isLoadingLibrary}
             currentScriptureId={currentScriptureId}

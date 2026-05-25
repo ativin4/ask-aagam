@@ -100,6 +100,7 @@ export default function ScriptureListTable({
                             >
                               Edit
                             </button>
+
                           </div>
                         </div>
                       )}

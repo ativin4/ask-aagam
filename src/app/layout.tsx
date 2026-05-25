@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegister from './components/ServiceWorkerRegister';
@@ -13,15 +13,31 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  minimumScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#ffffff',
+};
+
 export const metadata: Metadata = {
   title: "Ask Aagam",
   description: "For reading and understanding jain scriptures",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Ask Aagam',
+  },
   icons: {
-    icon: "/ask-aagam.png",
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
     apple: [
-        { url: '/ask-aagam.png', sizes: '180x180', type: 'image/png' },
-      ],
+      { url: '/icon-apple.png', sizes: '180x180', type: 'image/png' },
+    ],
   },
 };
 
