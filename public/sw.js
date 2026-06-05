@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const APP_CACHE = `ask-aagam-app-${CACHE_VERSION}`;
 const STATIC_CACHE = `ask-aagam-static-${CACHE_VERSION}`;
 
@@ -70,6 +70,22 @@ async function staleWhileRevalidate(request) {
   return new Response('You are offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
 }
 
+// Network-first for navigation — page HTML always fresh, fallback to cache when offline
+async function networkFirst(request) {
+  const cache = await caches.open(APP_CACHE);
+  try {
+    const response = await fetch(request);
+    if (response.status === 200) cache.put(request, response.clone());
+    return response;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    const offline = await cache.match('/offline.html');
+    if (offline) return offline;
+    return new Response('You are offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+  }
+}
+
 // ── Fetch: route by request type ─────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
   const { request } = event;
@@ -98,7 +114,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // App pages and public assets — stale-while-revalidate
+  // Page navigations — network-first so HTML is always up to date
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  // Public assets (icons, manifest) — stale-while-revalidate
   event.respondWith(staleWhileRevalidate(request));
 });
 

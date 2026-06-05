@@ -35,6 +35,21 @@ const SUGGESTED = [
   "What is Sarvarthasiddhi's commentary on right faith?",
 ];
 
+// Detect dominant script: Devanagari → hi-IN, else en-US
+function detectLang(text: string): string {
+  const devaChars = (text.match(/[ऀ-ॿ]/g) || []).length;
+  return devaChars / Math.max(text.length, 1) > 0.2 ? "hi-IN" : "en-US";
+}
+
+// Strip citation markers [N] and markdown for cleaner speech
+function cleanForSpeech(text: string): string {
+  return text
+    .replace(/\[\d+\]/g, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\n+/g, " ")
+    .trim();
+}
+
 export default function ChatBot() {
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -45,9 +60,12 @@ export default function ChatBot() {
   const [input, setInput] = useState("");
   const [selectedScriptureId, setSelectedScriptureId] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -164,7 +182,71 @@ export default function ChatBot() {
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
   };
 
-  const handleClose = () => { setIsOpen(false); setIsExpanded(false); };
+  const handleClose = () => {
+    stopSpeaking();
+    stopListening();
+    setIsOpen(false);
+    setIsExpanded(false);
+  };
+
+  // ── TTS (Web Speech API) ──────────────────────────────────────────────────
+  const speak = useCallback((text: string, msgId: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const clean = cleanForSpeech(text);
+    if (!clean) return;
+    const utter = new SpeechSynthesisUtterance(clean);
+    utter.lang = detectLang(clean);
+    utter.rate = 0.9;
+    utter.onstart = () => setSpeakingId(msgId);
+    utter.onend = () => setSpeakingId(null);
+    utter.onerror = () => setSpeakingId(null);
+    window.speechSynthesis.speak(utter);
+  }, []);
+
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeakingId(null);
+  }, []);
+
+  // ── STT (Web Speech API) ──────────────────────────────────────────────────
+  const startListening = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { alert("Voice input not supported in this browser. Use Chrome."); return; }
+    stopSpeaking();
+    const rec = new SR();
+    recognitionRef.current = rec;
+    rec.lang = "hi-IN";          // hi-IN handles both Hindi and English queries
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.onstart = () => setIsListening(true);
+    rec.onresult = (e: any) => {
+      const transcript = Array.from(e.results as SpeechRecognitionResultList)
+        .map((r: SpeechRecognitionResult) => r[0].transcript)
+        .join("");
+      setInput(transcript);
+      if (inputRef.current) {
+        inputRef.current.style.height = "auto";
+        inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + "px";
+      }
+    };
+    rec.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+      // Focus input so user can review + press Enter to send
+      setTimeout(() => inputRef.current?.focus(), 100);
+    };
+    rec.onerror = () => { setIsListening(false); recognitionRef.current = null; };
+    rec.start();
+  }, [stopSpeaking]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  }, []);
 
   // ── Panel geometry (JS-driven — Tailwind JIT can't scan dynamic strings) ──
   const getPanelStyle = (): React.CSSProperties => {
@@ -377,6 +459,38 @@ export default function ChatBot() {
                     )}
                   </div>
 
+                  {/* TTS button on completed assistant messages */}
+                  {msg.role === "assistant" && !msg.isStreaming && msg.content && (
+                    <button
+                      onClick={() => speakingId === msg.id ? stopSpeaking() : speak(msg.content, msg.id)}
+                      title={speakingId === msg.id ? "Stop reading" : "Read aloud"}
+                      className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors"
+                      style={{
+                        color: speakingId === msg.id ? "#7c3aed" : "#9ca3af",
+                        background: speakingId === msg.id ? "#f3e8ff" : "transparent",
+                      }}
+                    >
+                      {speakingId === msg.id ? (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="6" width="4" height="12" rx="1"/>
+                            <rect x="14" y="6" width="4" height="12" rx="1"/>
+                          </svg>
+                          Stop
+                        </>
+                      ) : (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                          </svg>
+                          Read
+                        </>
+                      )}
+                    </button>
+                  )}
+
                   {msg.citations && msg.citations.length > 0 && (
                     <div className="space-y-1.5">
                       {msg.citations.map((c) => (
@@ -419,12 +533,44 @@ export default function ChatBot() {
           <div className={`py-3 flex-shrink-0 ${isExpanded ? "px-4 sm:px-8" : "px-4"}`}
             style={{ borderTop: "1px solid #f0f0f0", background: "#fafafa" }}>
             <div className="flex items-end gap-2">
+              {/* Mic button — STT */}
+              <button
+                onClick={isListening ? stopListening : startListening}
+                disabled={isStreaming}
+                title={isListening ? "Stop listening" : "Speak your question (Hindi/English)"}
+                className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-40"
+                style={{
+                  background: isListening
+                    ? "linear-gradient(135deg, #dc2626, #ef4444)"
+                    : "#f3f4f6",
+                  color: isListening ? "white" : "#6b7280",
+                  animation: isListening ? "pulse 1.5s infinite" : undefined,
+                }}
+              >
+                {isListening ? (
+                  // Animated mic (recording)
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z"/>
+                    <path d="M19 10a7 7 0 0 1-14 0" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                    <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z" opacity="0.7"/>
+                    <path d="M19 10a7 7 0 0 1-14 0" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7"/>
+                    <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+                    <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+                  </svg>
+                )}
+              </button>
+
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={handleTextareaChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask a question..."
+                placeholder={isListening ? "Listening…" : "Ask a question…"}
                 rows={1}
                 disabled={isStreaming}
                 className="flex-1 resize-none text-sm px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none disabled:opacity-60 overflow-y-auto"
@@ -450,7 +596,9 @@ export default function ChatBot() {
                 </button>
               )}
             </div>
-            <p className="text-xs text-gray-400 mt-2 text-center">Enter to send · Shift+Enter for new line</p>
+            <p className="text-xs text-gray-400 mt-2 text-center">
+              {isListening ? "🔴 Listening — speak now (Hindi or English)" : "Enter to send · Shift+Enter for new line"}
+            </p>
           </div>
         </div>
       </div>
