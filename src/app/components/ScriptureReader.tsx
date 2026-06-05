@@ -255,6 +255,7 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
           pdfUrl={pdfUrl}
           isOffline={offlineScriptureIds.has(currentScripture.id)}
           jumpToPage={jumpToPage}
+          isMaintainer={isMaintainer}
           onDownload={handleDownloadPdf}
           onToggleOffline={handleToggleOffline}
           onClose={handleRead}

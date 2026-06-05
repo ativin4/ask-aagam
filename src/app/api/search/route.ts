@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { expandJainQuery } from "../../../../lib/jainGlossary";
 
 const HF_API = "https://router.huggingface.co/hf-inference/models/intfloat/multilingual-e5-large";
 const QDRANT_COLLECTION = "scripture_pages";
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "query is required" }, { status: 400 });
     }
 
-    const vector = await embedQuery(query.trim());
+    const vector = await embedQuery(expandJainQuery(query.trim()));
     const hits = await searchQdrant(vector, limit, {
       scriptureId: scriptureId ? [scriptureId] : [],
       categories: categories ?? [],

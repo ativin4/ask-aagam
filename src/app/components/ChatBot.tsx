@@ -8,7 +8,7 @@ interface Citation {
   bookId: string;
   bookTitle: string;
   pageNumber: number;
-  paragraphNumber: number | null;
+  paraNumber: number | null;
   gathaNumber: string | null;
   gathaRange: string | null;
   chapterNumber: number | null;
@@ -24,7 +24,16 @@ interface Message {
   isStreaming?: boolean;
 }
 
-const SUGGESTED = ["What is Ahimsa?", "Explain Samayika", "What is Moksha?"];
+const SUGGESTED = [
+  "What are the 5 types of jiva bhavas?",
+  "How does karma bind to the soul according to Tattvartha Sutra?",
+  "Explain Anekantavada and Syadvada",
+  "What is the path to moksha in Jainism?",
+  "Difference between Samyagdarshana, Samyagjnana and Samyakcharitra",
+  "What are the 14 gunasthanas?",
+  "Explain the nature of Pudgal (matter) in Jain philosophy",
+  "What is Sarvarthasiddhi's commentary on right faith?",
+];
 
 export default function ChatBot() {
   const [mounted, setMounted] = useState(false);
@@ -348,7 +357,19 @@ export default function ChatBot() {
                       </span>
                     ) : (
                       <>
-                        <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
+                        <span style={{ whiteSpace: "pre-wrap" }}>
+                          {msg.content.split(/(\[\d+\])/).map((part, i) => {
+                            const m = part.match(/^\[(\d+)\]$/);
+                            if (m) {
+                              return (
+                                <sup key={i} style={{ color: "#7c3aed", fontWeight: 700, fontSize: "0.7em", cursor: "pointer" }}>
+                                  [{m[1]}]
+                                </sup>
+                              );
+                            }
+                            return <span key={i}>{part}</span>;
+                          })}
+                        </span>
                         {msg.isStreaming && (
                           <span className="inline-block w-0.5 h-4 ml-0.5 align-middle animate-pulse" style={{ background: "currentColor" }} />
                         )}
@@ -377,7 +398,7 @@ export default function ChatBot() {
                             <p className="text-xs" style={{ color: "#9333ea" }}>
                               {c.chapterNumber ? `Ch. ${c.chapterNumber} · ` : ""}
                               {c.gathaRange ? `Gatha ${c.gathaRange}` : c.gathaNumber ? `Gatha ${c.gathaNumber}` : `Page ${c.pageNumber}`}
-                              {c.paragraphNumber ? ` · Para ${c.paragraphNumber}` : ""}
+                              {c.paraNumber ? ` · Para ${c.paraNumber}` : ""}
                             </p>
                           </div>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9333ea" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>

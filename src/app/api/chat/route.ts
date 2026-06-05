@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { expandJainQuery } from "../../../../lib/jainGlossary";
 
 const HF_API = "https://router.huggingface.co/hf-inference/models/intfloat/multilingual-e5-large";
 const QDRANT_COLLECTION = "scripture_pages";
@@ -52,7 +53,7 @@ async function searchQdrant(vector: number[], limit: number, scriptureId?: strin
       book_id: string;
       book_title: string;
       page_number: number;
-      paragraph_number?: number;
+      para_number?: number;
       preview: string;
       categories: string[];
       gatha_number?: string;
@@ -77,8 +78,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "query required" }, { status: 400 });
     }
 
-    const vector = await embedQuery(query.trim());
-    const hits = await searchQdrant(vector, 5, scriptureId || undefined);
+    const vector = await embedQuery(expandJainQuery(query.trim()));
+    const rawHits = await searchQdrant(vector, 15, scriptureId || undefined);
+    // Deduplicate by (bookId, pageNumber) — keep highest-scoring hit per page
+    const seen = new Set<string>();
+    const hits = rawHits
+      .filter((h) => h.score >= 0.35)
+      .filter((h) => {
+        const key = `${h.payload.book_id}:${h.payload.page_number}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 6);
 
     if (!hits.length) {
       const stream = new ReadableStream({
@@ -121,7 +133,7 @@ export async function POST(request: Request) {
       bookId: h.payload.book_id,
       bookTitle: h.payload.book_title,
       pageNumber: h.payload.page_number,
-      paragraphNumber: h.payload.paragraph_number ?? null,
+      paraNumber: h.payload.para_number ?? null,
       gathaNumber: h.payload.gatha_number ?? null,
       gathaRange: h.payload.gatha_range ?? null,
       chapterNumber: h.payload.chapter_number ?? null,
@@ -139,16 +151,19 @@ export async function POST(request: Request) {
       return `[${c.index}] ${c.bookTitle}${ch}, ${loc}:\n${c.preview}`;
     }).join("\n\n---\n\n");
 
-    const systemPrompt = `You are a knowledgeable and reverent assistant for Jain scriptures (Aagams). Answer questions using ONLY the provided scripture passages. Always cite sources using [number] notation. Be accurate, concise, and respectful of the sacred nature of these texts.
+    const systemPrompt = `You are a knowledgeable assistant for Jain scriptures and philosophy. Answer using ONLY the retrieved passages provided below — these are from authentic Jain texts including Tattvartha Sutra, Sarvarthasiddhi, and other Aagams.
 
-SCRIPTURE PASSAGES:
+RETRIEVED PASSAGES:
 ${context}
 
 RULES:
-- Use ONLY information from the passages above
-- Cite with [1], [2], etc. when referencing a passage
-- If the passages don't contain the answer, say so clearly
-- Keep responses focused and meaningful`;
+- Ground every claim in the passages. Cite with [N] inline whenever passage N contributes to your answer.
+- For philosophical/technical terms (gunasthanas, bhavas, naya, syadvada, etc.) extract and explain what the passages say — even partial information is valuable.
+- If multiple passages address different aspects of the question, synthesize them with citations.
+- If passages only partially answer, state what they say and acknowledge what they don't cover.
+- If no passage is relevant: "The retrieved passages do not contain information about this topic."
+- Write in a clear, respectful tone appropriate for scripture study. Use the Sanskrit/Prakrit terms from the text with brief explanations.
+- Do NOT cite [N] in a negative context (e.g. "passage N does not say"). Only cite what passages DO say.`;
 
     const groqMessages = [
       { role: "system", content: systemPrompt },
@@ -178,6 +193,7 @@ RULES:
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let fullResponse = "";
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -195,7 +211,15 @@ RULES:
               if (!line.startsWith("data: ")) continue;
               const raw = line.slice(6).trim();
               if (raw === "[DONE]") {
-                enqueue(controller, { type: "citations", data: citations });
+                // Only show citations the LLM explicitly used (positive context)
+                const used = citations.filter((c) => {
+                  const tag = `[${c.index}]`;
+                  const idx = fullResponse.indexOf(tag);
+                  if (idx === -1) return false;
+                  const before = fullResponse.slice(Math.max(0, idx - 60), idx).toLowerCase();
+                  return !/(not mention|no mention|do not|does not|don't|doesn't|lack|absent|cannot find)/.test(before);
+                });
+                enqueue(controller, { type: "citations", data: used });
                 enqueue(controller, "[DONE]");
                 controller.close();
                 return;
@@ -203,7 +227,10 @@ RULES:
               try {
                 const parsed = JSON.parse(raw);
                 const content = parsed.choices?.[0]?.delta?.content;
-                if (content) enqueue(controller, { type: "token", content });
+                if (content) {
+                  fullResponse += content;
+                  enqueue(controller, { type: "token", content });
+                }
               } catch {
                 // skip malformed chunk
               }
