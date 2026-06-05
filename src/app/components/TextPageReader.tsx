@@ -48,7 +48,9 @@ const SUTRA_END    = /[।॥][०-९0-9\s]*[।॥]\s*$/;
 const ANVAYARTHA   = /^(?:अन्वयार्थ\s*[:-]|Meaning\s*[:-]|अर्थ\s*[:-])/i;
 const COMMENTARY   = /^(?:सर्वार्थसिद्धि\s*[:-]|राजवार्तिक\s*[:-]|टीका\s*[:-]|विवेचन\s*[:-])/i;
 const CHAPTER_HDR  = /^(?:अथ\s+\S+|(?:प्रथम|द्वितीय|तृतीय|चतुर्थ|पञ्चम|षष्ठ|सप्तम|अष्टम|नवम|दशम)[ःो]\s)/;
-const SECTION_MKR  = /^§\s*\.?\s*\d+/;
+const SECTION_MKR  = /^§\s*\.?\s*\d*/;    // § alone OR § N
+const LONE_SECTION = /^§\s*$/;             // bare § separator
+const PAGE_HDR     = /^[—–-]\d+\s*§/;     // "—113 § 16]" page header artifact
 const FOOTNOTE_HDR = /^(?:Footnotes?|टिप्पण|पादटिप्पण)\s*[:-]/i;
 
 function renderLines(lines: string[]): ReactNode[] {
@@ -75,8 +77,13 @@ function renderLines(lines: string[]): ReactNode[] {
       return;
     }
 
-    // Section marker § N
+    // Section marker § N  (or bare § = thin rule separator)
     if (SECTION_MKR.test(seg)) {
+      if (LONE_SECTION.test(seg)) {
+        // Bare § — just a thin visual separator
+        nodes.push(<hr key={i} className="my-3 border-dashed border-gray-200" />);
+        return;
+      }
       const m = seg.match(/^(§\s*\.?\s*\d+)(.*)/s);
       const badge = m ? m[1].trim() : seg;
       const rest  = m ? m[2].trim() : "";
@@ -85,7 +92,7 @@ function renderLines(lines: string[]): ReactNode[] {
           <span className="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 font-mono mt-0.5">
             {badge}
           </span>
-          {rest && <p className="flex-1 text-gray-700 text-sm leading-relaxed">{rest}</p>}
+          {rest && <p className="flex-1 text-gray-700 leading-relaxed">{rest}</p>}
         </div>
       );
       return;
@@ -131,6 +138,14 @@ function renderLines(lines: string[]): ReactNode[] {
     if (NUMBERED_START.test(seg)) {
       nodes.push(
         <p key={i} className="mt-4 mb-2 font-medium text-gray-800">{seg}</p>
+      );
+      return;
+    }
+
+    // Page header artifact (e.g. "—113 § 16]") — render dimmed
+    if (PAGE_HDR.test(seg)) {
+      nodes.push(
+        <p key={i} className="text-xs text-gray-300 mb-1 font-mono">{seg}</p>
       );
       return;
     }
