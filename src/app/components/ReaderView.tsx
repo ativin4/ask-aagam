@@ -50,8 +50,10 @@ export default function ReaderView({
   }, []);
 
   // Reset on scripture change or citation jump
+  // If no PDF URL (text-only/GitHub scriptures), default to OCR view
   useEffect(() => {
-    setViewMode("pdf");
+    const hasPdf = !!scripture.url;
+    setViewMode(hasPdf ? "pdf" : "ocr");
     ocrPageRef.current = jumpToPage ?? null;
     setPdfPageFragment(jumpToPage ?? 1);
     setActiveJumpToPage(jumpToPage ?? null);
@@ -59,7 +61,7 @@ export default function ReaderView({
     setSearchResults([]);
     setShowResults(false);
     setIsSearchOpen(false);
-  }, [scripture.id, jumpToPage]);
+  }, [scripture.id, jumpToPage, scripture.url]);
 
   // Handle search
   useEffect(() => {

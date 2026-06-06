@@ -142,6 +142,11 @@ export default function ChatBot() {
               setMessages((prev) =>
                 prev.map((m) => m.id === asstId ? { ...m, content: m.content + event.content } : m)
               );
+            } else if (event.type === "replace_content") {
+              // Server renumbered citations 1…N — replace streamed text wholesale
+              setMessages((prev) =>
+                prev.map((m) => m.id === asstId ? { ...m, content: event.content } : m)
+              );
             } else if (event.type === "citations") {
               citations = event.data;
             }

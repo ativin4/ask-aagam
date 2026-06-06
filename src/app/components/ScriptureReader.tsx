@@ -227,7 +227,7 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
 
 
   return (
-    <div className={isReading ? "flex flex-col lg:flex-row gap-6 lg:h-[80vh]" : "space-y-6"}>
+    <div className={isReading ? "flex flex-col lg:flex-row gap-2 lg:gap-6 lg:h-[80vh]" : "space-y-6"}>
       <LibrarySidebar
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}

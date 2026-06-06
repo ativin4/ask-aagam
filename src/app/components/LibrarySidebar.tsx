@@ -51,7 +51,8 @@ export default function LibrarySidebar({
   };
   return (
     <div className={isReading ? "w-full lg:w-1/3 xl:w-1/4 flex flex-col min-h-0 lg:h-full" : "space-y-6"}>
-      <div className={isReading ? "flex-none space-y-2 mb-2" : "flex flex-col gap-2"}>
+      {/* Search + status — hidden on mobile when reading (reader has its own search) */}
+      <div className={isReading ? "flex-none space-y-2 mb-2 hidden lg:block" : "flex flex-col gap-2"}>
         <input
           type="text"
           placeholder="Search scriptures or content…"

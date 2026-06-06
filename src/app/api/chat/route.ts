@@ -211,7 +211,7 @@ RULES:
               if (!line.startsWith("data: ")) continue;
               const raw = line.slice(6).trim();
               if (raw === "[DONE]") {
-                // Only show citations the LLM explicitly used (positive context)
+                // Filter to citations the LLM actually used in positive context
                 const used = citations.filter((c) => {
                   const tag = `[${c.index}]`;
                   const idx = fullResponse.indexOf(tag);
@@ -219,7 +219,24 @@ RULES:
                   const before = fullResponse.slice(Math.max(0, idx - 60), idx).toLowerCase();
                   return !/(not mention|no mention|do not|does not|don't|doesn't|lack|absent|cannot find)/.test(before);
                 });
-                enqueue(controller, { type: "citations", data: used });
+
+                // Renumber citations 1…N sequentially so button numbers match text
+                let patchedResponse = fullResponse;
+                const renumbered = used.map((c, i) => {
+                  const newIdx = i + 1;
+                  // Replace [oldIdx] → [newIdx] in response text (only if different)
+                  if (c.index !== newIdx) {
+                    patchedResponse = patchedResponse.replaceAll(`[${c.index}]`, `[${newIdx}]`);
+                  }
+                  return { ...c, index: newIdx };
+                });
+
+                // If any renumbering happened, push a text-patch token before DONE
+                if (patchedResponse !== fullResponse) {
+                  enqueue(controller, { type: "replace_content", content: patchedResponse });
+                }
+
+                enqueue(controller, { type: "citations", data: renumbered });
                 enqueue(controller, "[DONE]");
                 controller.close();
                 return;
