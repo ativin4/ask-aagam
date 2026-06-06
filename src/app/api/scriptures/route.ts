@@ -27,7 +27,7 @@ const storage = new Storage({
 const bucketName = process.env.NEXT_PUBLIC_BUCKET_NAME!;
 const bucket = storage.bucket(bucketName);
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic'; // never cache — list must reflect uploads immediately
 
 export async function GET() {
   try {

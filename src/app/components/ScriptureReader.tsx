@@ -32,20 +32,30 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
 
   useEffect(() => {
     const fetchLibrary = async () => {
-        // 1. Try loading from local storage first for offline support
+        // Show cached list immediately while fetching fresh (offline support)
         const cached = localStorage.getItem("scripture_library_cache");
         if (cached) {
-            setAvailableScriptures(JSON.parse(cached));
-            setIsLoadingLibrary(false);
+            try {
+                const { scriptures } = JSON.parse(cached);
+                if (Array.isArray(scriptures)) {
+                    setAvailableScriptures(scriptures);
+                    setIsLoadingLibrary(false);
+                }
+            } catch { /* ignore corrupted cache */ }
         }
 
         try {
-            const res = await fetch("/api/scriptures", { cache: 'no-store' });
+            // Always fetch fresh — API is force-dynamic (no server-side cache)
+            const res = await fetch("/api/scriptures", {
+                cache: "no-store",
+                headers: { "Cache-Control": "no-cache" },
+            });
             if (res.ok) {
                 const data = await res.json();
                 setAvailableScriptures(data.scriptures);
-                // 2. Update cache with fresh data
-                localStorage.setItem("scripture_library_cache", JSON.stringify(data.scriptures));
+                // Store with timestamp so we can show "last synced" later if needed
+                localStorage.setItem("scripture_library_cache",
+                    JSON.stringify({ scriptures: data.scriptures, fetchedAt: Date.now() }));
             }
         } catch (error) {
             console.error("Failed to load library", error);

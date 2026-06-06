@@ -78,7 +78,12 @@ export default function ChatBot() {
   useEffect(() => {
     const cached = localStorage.getItem("scripture_library_cache");
     if (cached) {
-      try { setScriptures(JSON.parse(cached)); } catch { /* ignore */ }
+      try {
+        const parsed = JSON.parse(cached);
+        // Support both old format (array) and new format ({scriptures, fetchedAt})
+        const list = Array.isArray(parsed) ? parsed : parsed.scriptures ?? [];
+        setScriptures(list);
+      } catch { /* ignore */ }
     }
   }, [isOpen]);
 
