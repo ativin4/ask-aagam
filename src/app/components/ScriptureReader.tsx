@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { auth } from "../../../lib/firebase";
 import { saveScriptureOffline, getScriptureOffline, deleteScriptureOffline, getOfflineScriptureIds } from "../../../lib/db";
 import { Scripture, VectorSearchResult } from "./types";
@@ -23,6 +23,10 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
   const [isMobileListOpen, setIsMobileListOpen] = useState(false);
   const [editingScripture, setEditingScripture] = useState<Scripture | null>(null);
   const [jumpToPage, setJumpToPage] = useState<number | null>(null);
+  const availableScripturesRef = useRef<Scripture[]>([]);
+  const handleReadRef = useRef<((s: Scripture) => void) | null>(null);
+  // Keep refs fresh on every render
+  availableScripturesRef.current = availableScriptures;
   const [vectorResults, setVectorResults] = useState<VectorSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -65,11 +69,11 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
     const handleOpenScripture = (e: Event) => {
       const { bookId, pageNumber } = (e as CustomEvent).detail;
       setJumpToPage(pageNumber ?? null);
-      setAvailableScriptures((prev) => {
-        const scripture = prev.find((s) => s.id === bookId);
-        if (scripture) handleRead(scripture);
-        return prev;
-      });
+      // Use ref to avoid stale closure — don't call side effects inside setState
+      const scripture = availableScripturesRef.current.find((s) => s.id === bookId);
+      if (scripture && handleReadRef.current) {
+        handleReadRef.current(scripture);
+      }
     };
     window.addEventListener("openScripture", handleOpenScripture);
     return () => window.removeEventListener("openScripture", handleOpenScripture);
@@ -163,6 +167,7 @@ export default function ScriptureReader({ isMaintainer = false }: ScriptureReade
     }
   };
 
+  handleReadRef.current = (scripture: Scripture) => { handleRead(scripture); };
   const handleRead = async (scripture: Scripture) => {
     if (currentScriptureId === scripture.id) {
       setPdfUrl(null);

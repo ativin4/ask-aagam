@@ -184,6 +184,7 @@ export default function TextPageReader({
   const [loading, setLoading]   = useState(true);
   const [fontSize, setFontSize] = useState(17);
   const [editMode, setEditMode] = useState(false);
+  const [pageInput, setPageInput] = useState<string>(""); // local text for page input
   const [editText, setEditText] = useState("");
   const [saving, setSaving]     = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -237,9 +238,15 @@ export default function TextPageReader({
   }, [editText, scriptureId, pages, current]);
 
   const goTo = useCallback((idx: number) => {
-    setCurrent(Math.max(0, Math.min(idx, (pages.length || 1) - 1)));
+    const safeIdx = Math.max(0, Math.min(idx, (pages.length || 1) - 1));
+    setCurrent(safeIdx);
     setEditMode(false);
   }, [pages.length]);
+
+  // Keep input display in sync with current page (but not while user is editing)
+  useEffect(() => {
+    if (pages.length > 0) setPageInput(String(pages[current]?.pageNumber ?? ""));
+  }, [current, pages]);
 
   if (loading) return (
     <div className="absolute inset-0 flex items-center justify-center">
@@ -353,20 +360,31 @@ export default function TextPageReader({
           Prev
         </button>
 
-        {/* Page picker */}
+        {/* Page picker — navigate on Enter or blur, not on every keystroke */}
         <div className="flex items-center gap-2">
           <input
             type="number"
+            inputMode="numeric"
+            pattern="[0-9]*"
             min={1}
             max={pages.length}
             id="page-number-input"
             name="page"
-            value={page.pageNumber}
-            onChange={(e) => {
-              const n = parseInt(e.target.value);
+            value={pageInput}
+            onChange={(e) => setPageInput(e.target.value)}
+            onBlur={() => {
+              const n = parseInt(pageInput);
               if (!isNaN(n)) {
                 const idx = pages.findIndex((p) => p.pageNumber === n);
                 if (idx !== -1) goTo(idx);
+                else setPageInput(String(page.pageNumber)); // reset if invalid
+              } else {
+                setPageInput(String(page.pageNumber));
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                (e.target as HTMLInputElement).blur();
               }
             }}
             className="w-16 text-center border border-gray-200 rounded-lg py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:border-transparent"
