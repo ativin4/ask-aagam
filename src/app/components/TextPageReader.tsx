@@ -84,7 +84,7 @@ function renderLines(lines: string[]): ReactNode[] {
         nodes.push(<hr key={i} className="my-3 border-dashed border-gray-200" />);
         return;
       }
-      const m = seg.match(/^(§\s*\.?\s*\d+)(.*)/s);
+      const m = seg.match(/^(§\s*\.?\s*\d+)([\s\S]*)/);
       const badge = m ? m[1].trim() : seg;
       const rest  = m ? m[2].trim() : "";
       nodes.push(

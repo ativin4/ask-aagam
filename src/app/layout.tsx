@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Noto_Sans_Devanagari } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegister from './components/ServiceWorkerRegister';
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,6 +60,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${notoDevanagari.variable} antialiased`}
       >
         <ServiceWorkerRegister />
+        <Analytics />
         {children}
       </body>
     </html>
