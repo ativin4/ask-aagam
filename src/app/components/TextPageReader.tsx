@@ -335,7 +335,8 @@ export default function TextPageReader({
       </div>
 
       {/* ── Pagination ───────────────────────────────────────────────────── */}
-      <div className="flex-none flex items-center justify-between gap-3 px-4 py-3 bg-white border-t border-gray-200">
+      {/* pr-20 on mobile gives space for the fixed chat FAB (bottom-6 right-6 = ~56px wide) */}
+      <div className="flex-none flex items-center justify-between gap-3 px-4 py-3 pr-20 sm:pr-4 bg-white border-t border-gray-200">
         {/* Prev */}
         <button
           onClick={() => goTo(current - 1)}

@@ -36,7 +36,7 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="p-8 font-sans max-w-5xl mx-auto">
+    <main className="p-3 sm:p-8 font-sans max-w-5xl mx-auto">
       {showIosHint && (
         <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded mb-6 text-sm">
           <p className="font-semibold mb-1">Install App on iOS</p>

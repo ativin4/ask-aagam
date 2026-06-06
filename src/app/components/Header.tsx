@@ -18,23 +18,21 @@ export default function Header({ user, isMaintainer, isLoading }: HeaderProps) {
   };
 
   return (
-    <div className="flex justify-between items-center mb-8 border-b pb-4">
-      <div className="flex items-center gap-8">
-        <Link href="/" className="text-3xl font-bold hover:opacity-80 transition">
-          Aagam Library
-        </Link>
-      </div>
-      
+    <div className="flex justify-between items-center mb-3 sm:mb-8 border-b pb-2 sm:pb-4">
+      <Link href="/" className="text-xl sm:text-3xl font-bold hover:opacity-80 transition">
+        Aagam Library
+      </Link>
+
       {!isLoading && (!user ? (
-        <button onClick={handleLogin} className="bg-blue-600 text-white px-4 py-2 rounded">
+        <button onClick={handleLogin} className="bg-blue-600 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded text-sm sm:text-base">
           Sign in with Google
         </button>
       ) : (
-        <div className="flex items-center gap-4">
-          <Link href="/profile" className="text-sm font-medium hover:text-blue-600 transition">
-            {user.displayName} {isMaintainer ? "(Maintainer)" : "(Reader)"}
-          </Link>
-          <button onClick={() => signOut(auth)} className="bg-red-500 text-white px-4 py-2 rounded">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <span className="hidden sm:inline text-sm font-medium text-gray-700">
+            {user.displayName} {isMaintainer ? "(Maintainer)" : ""}
+          </span>
+          <button onClick={() => signOut(auth)} className="bg-red-500 text-white px-2 py-1 sm:px-4 sm:py-2 rounded text-xs sm:text-base">
             Sign out
           </button>
         </div>
