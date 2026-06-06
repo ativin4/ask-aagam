@@ -231,6 +231,8 @@ export default function ReaderView({
           <div className="px-3 pb-3 relative">
             <div className="relative">
               <input
+                id="reader-search"
+                name="reader-search"
                 type="text"
                 placeholder={`Search in ${scripture.title}...`}
                 value={localSearchTerm}

@@ -359,6 +359,8 @@ export default function TextPageReader({
             type="number"
             min={1}
             max={pages.length}
+            id="page-number-input"
+            name="page"
             value={page.pageNumber}
             onChange={(e) => {
               const n = parseInt(e.target.value);
