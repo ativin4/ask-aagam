@@ -3,7 +3,51 @@ import { expandJainQuery } from "../../../../lib/jainGlossary";
 
 const HF_API = "https://router.huggingface.co/hf-inference/models/intfloat/multilingual-e5-large";
 const QDRANT_COLLECTION = "scripture_pages";
+const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
+
+async function fetchLLMStream(messages: object[]): Promise<Response> {
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const res = await fetch(GEMINI_API, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.GEMINI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gemini-2.5-flash",
+          messages,
+          stream: true,
+          max_tokens: 1024,
+          temperature: 0.3,
+        }),
+      });
+      if (res.ok) return res;
+    } catch {
+      // fall through to Groq
+    }
+  }
+  const res = await fetch(GROQ_API, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages,
+      stream: true,
+      max_tokens: 1024,
+      temperature: 0.3,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`LLM failed (${res.status}): ${err}`);
+  }
+  return res;
+}
 
 async function embedQuery(query: string): Promise<number[]> {
   const res = await fetch(HF_API, {
@@ -157,39 +201,22 @@ RETRIEVED PASSAGES:
 ${context}
 
 RULES:
+- Respond in the same language as the user's query. If the query is in Hindi or Hinglish (Hindi written in English letters), respond in proper Hindi (Devanagari script). If English, respond in English.
 - Ground every claim in the passages. Cite with [N] inline whenever passage N contributes to your answer.
 - For philosophical/technical terms (gunasthanas, bhavas, naya, syadvada, etc.) extract and explain what the passages say — even partial information is valuable.
 - If multiple passages address different aspects of the question, synthesize them with citations.
 - If passages only partially answer, state what they say and acknowledge what they don't cover.
-- If no passage is relevant: "The retrieved passages do not contain information about this topic."
+- If no passage is relevant: "The retrieved passages do not contain information about this topic." (Translate this phrase if responding in Hindi).
 - Write in a clear, respectful tone appropriate for scripture study. Use the Sanskrit/Prakrit terms from the text with brief explanations.
 - Do NOT cite [N] in a negative context (e.g. "passage N does not say"). Only cite what passages DO say.`;
 
-    const groqMessages = [
+    const llmMessages = [
       { role: "system", content: systemPrompt },
       ...messages.slice(-6),
       { role: "user", content: query },
     ];
 
-    const groqRes = await fetch(GROQ_API, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: groqMessages,
-        stream: true,
-        max_tokens: 1024,
-        temperature: 0.3,
-      }),
-    });
-
-    if (!groqRes.ok) {
-      const err = await groqRes.text();
-      throw new Error(`Groq failed (${groqRes.status}): ${err}`);
-    }
+    const llmRes = await fetchLLMStream(llmMessages);
 
     const decoder = new TextDecoder();
     let buffer = "";
@@ -197,7 +224,7 @@ RULES:
 
     const stream = new ReadableStream({
       async start(controller) {
-        const reader = groqRes.body!.getReader();
+        const reader = llmRes.body!.getReader();
         try {
           while (true) {
             const { done, value } = await reader.read();
