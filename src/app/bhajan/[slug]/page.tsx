@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { adminDb } from "../../../../lib/firebaseAdmin";
+import CommentSection from "../../components/CommentSection";
 
 export const revalidate = 3600;
 
@@ -10,6 +11,8 @@ interface Bhajan {
   lyrics: string;
   category: string;
   slug: string;
+  writer?: string;
+  meaning?: string;
 }
 
 async function getBhajan(slug: string): Promise<Bhajan | null> {
@@ -28,7 +31,8 @@ export async function generateMetadata({
   if (!bhajan) return { title: "Bhajan Not Found | Ask Aagam" };
 
   const firstLine = bhajan.lyrics.split("\n").find((l) => l.trim()) || "";
-  const description = `${bhajan.title} — Jain bhajan lyrics (${bhajan.category}). ${firstLine}`.slice(0, 160);
+  const writerPart = bhajan.writer ? ` By ${bhajan.writer}.` : "";
+  const description = `${bhajan.title} — Jain bhajan lyrics (${bhajan.category}).${writerPart} ${firstLine}`.slice(0, 160);
 
   return {
     title: `${bhajan.title} Jain Bhajan Lyrics | Ask Aagam`,
@@ -64,22 +68,64 @@ export default async function BhajanPage({
     genre: "Jain Bhajan",
     inLanguage: "hi",
     lyrics: { "@type": "CreativeWork", text: bhajan.lyrics },
+    ...(bhajan.writer ? { composer: { "@type": "Person", name: bhajan.writer } } : {}),
   };
 
   return (
     <main className="p-3 sm:p-8 font-sans max-w-3xl mx-auto">
-      <nav className="text-sm mb-6">
-        <Link href="/bhajans" className="text-blue-600 hover:underline">
-          ← All Bhajans
+      <nav className="flex items-center gap-2 text-sm mb-6 flex-wrap">
+        <Link href="/" className="text-blue-600 dark:text-blue-400 hover:underline">
+          ← Granth Library
         </Link>
-        <span className="mx-2 text-gray-400">/</span>
-        <span className="text-gray-500">{bhajan.category}</span>
+        <span className="text-gray-300 dark:text-gray-600">/</span>
+        <Link href="/bhajans" className="text-blue-600 dark:text-blue-400 hover:underline">
+          All Bhajans
+        </Link>
+        <span className="text-gray-300 dark:text-gray-600">/</span>
+        <span className="text-gray-500 dark:text-gray-400">{bhajan.category}</span>
       </nav>
-      <h1 className="text-2xl sm:text-3xl font-bold mb-1">{bhajan.title}</h1>
-      <p className="text-sm text-gray-500 mb-6">{bhajan.category} · Jain Bhajan</p>
-      <div className="whitespace-pre-line leading-relaxed text-lg font-devanagari" style={{ fontFamily: "var(--font-devanagari)" }}>
-        {bhajan.lyrics}
+
+      <div className="mb-6">
+        <span className="inline-block text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300 mb-3">
+          {bhajan.category}
+        </span>
+        <h1 className="text-3xl sm:text-4xl font-bold" style={{ fontFamily: "var(--font-devanagari)" }}>
+          {bhajan.title}
+        </h1>
+        {bhajan.writer && (
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">रचयिता: {bhajan.writer}</p>
+        )}
       </div>
+
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 p-5 sm:p-8">
+        <div
+          className="whitespace-pre-line leading-loose text-lg sm:text-xl text-gray-800 dark:text-gray-100"
+          style={{ fontFamily: "var(--font-devanagari)" }}
+        >
+          {bhajan.lyrics}
+        </div>
+      </div>
+
+      {bhajan.meaning && (
+        <div className="mt-6 rounded-2xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 p-5 sm:p-8">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300 mb-3">
+            अर्थ (Meaning)
+          </h2>
+          <div
+            className="whitespace-pre-line leading-relaxed text-base text-gray-700 dark:text-gray-200"
+            style={{ fontFamily: "var(--font-devanagari)" }}
+          >
+            {bhajan.meaning}
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-400 dark:text-gray-600 mt-6">
+        Jain Bhajan · {bhajan.category}
+      </p>
+
+      <CommentSection slug={bhajan.slug} />
+
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
