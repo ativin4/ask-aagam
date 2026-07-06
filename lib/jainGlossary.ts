@@ -9,9 +9,9 @@
 const GLOSSARY: [string, ...string[]][] = [
   // Core philosophy
   ["non-violence", "ahimsa", "अहिंसा"],
-  ["liberation", "moksha", "मोक्ष", "mukti", "मुक्ति", "nirvana", "निर्वाण"],
-  ["soul", "atma", "jiva", "आत्मा", "जीव"],
-  ["karma", "कर्म"],
+  ["liberation", "moksha", "moksh", "मोक्ष", "mukti", "मुक्ति", "nirvana", "निर्वाण"],
+  ["soul", "atma", "jiva", "jiv", "आत्मा", "जीव"],
+  ["karma", "karm", "कर्म"],
   ["universe", "loka", "लोक"],
   ["omniscience", "keval gyan", "kevalajnana", "केवलज्ञान"],
   ["rebirth", "samsara", "संसार", "punarjanma", "पुनर्जन्म"],
@@ -50,15 +50,15 @@ const GLOSSARY: [string, ...string[]][] = [
   ["commentary", "tika", "टीका", "vritti", "वृत्ति"],
 
   // Karma theory
-  ["bondage", "bandha", "बंध"],
-  ["influx", "asrava", "आस्रव"],
-  ["stoppage", "samvara", "संवर"],
-  ["shedding", "nirjara", "निर्जरा"],
-  ["passions", "kashaya", "कषाय"],
-  ["anger", "krodha", "क्रोध"],
-  ["pride", "mana", "मान"],
+  ["bondage", "bandha", "bandh", "बंध"],
+  ["influx", "asrava", "asrav", "ashrav", "आस्रव"],
+  ["stoppage", "samvara", "samvar", "संवर"],
+  ["shedding", "nirjara", "nirjar", "निर्जरा"],
+  ["passions", "kashaya", "kashay", "कषाय"],
+  ["anger", "krodha", "krodh", "क्रोध"],
+  ["pride", "mana", "maan", "मान"],
   ["deceit", "maya", "माया"],
-  ["greed", "lobha", "लोभ"],
+  ["greed", "lobha", "lobh", "लोभ"],
 
   // Cosmology
   ["heavenly beings", "deva", "देव"],
@@ -68,9 +68,9 @@ const GLOSSARY: [string, ...string[]][] = [
   // Philosophy
   ["non-absolutism", "anekantavada", "अनेकान्तवाद", "syadvada", "स्याद्वाद"],
   ["conditional predication", "syadvada", "स्याद्वाद", "saptabhangi", "सप्तभंगी"],
-  ["substance", "dravya", "द्रव्य"],
-  ["quality", "guna", "गुण"],
-  ["mode", "paryaya", "पर्याय"],
+  ["substance", "dravya", "dravyas", "द्रव्य"],
+  ["quality", "guna", "gun", "गुण"],
+  ["mode", "paryaya", "paryay", "पर्याय"],
 
   // Jiva bhavas (spiritual states)
   ["jiva bhavas", "औपशमिक", "क्षायिक", "क्षायोपशमिक", "औदयिक", "पारिणामिक",

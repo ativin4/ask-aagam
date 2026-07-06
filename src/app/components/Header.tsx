@@ -19,9 +19,14 @@ export default function Header({ user, isMaintainer, isLoading }: HeaderProps) {
 
   return (
     <div className="flex justify-between items-center mb-3 sm:mb-8 border-b pb-2 sm:pb-4">
-      <Link href="/" className="text-xl sm:text-3xl font-bold hover:opacity-80 transition">
-        Aagam Library
-      </Link>
+      <div className="flex items-center gap-4 sm:gap-6">
+        <Link href="/" className="text-xl sm:text-3xl font-bold hover:opacity-80 transition">
+          Aagam Library
+        </Link>
+        <Link href="/bhajans" className="text-sm sm:text-base text-gray-600 hover:text-gray-900 transition">
+          Bhajans
+        </Link>
+      </div>
 
       {!isLoading && (!user ? (
         <button onClick={handleLogin} className="bg-blue-600 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded text-sm sm:text-base">

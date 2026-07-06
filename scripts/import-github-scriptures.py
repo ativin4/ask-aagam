@@ -137,14 +137,22 @@ def parse_sutra_html(html: str) -> dict:
 
 # ── Embeddings + Qdrant ───────────────────────────────────────────────────────
 def embed_texts(texts: list) -> list:
-    resp = requests.post(
-        HF_EMBED_API,
-        headers={"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"},
-        json={"inputs": [f"passage: {t}" for t in texts]},
-        timeout=60,
-    )
-    resp.raise_for_status()
-    return resp.json()
+    import time
+    for attempt in range(3):
+        try:
+            resp = requests.post(
+                HF_EMBED_API,
+                headers={"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"},
+                json={"inputs": [f"passage: {t}" for t in texts]},
+                timeout=60,
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.RequestException as e:
+            if attempt == 2:
+                raise e
+            time.sleep(3)
+    return []
 
 
 def upsert_qdrant(book_id, page_num, chapter, sutra_num, gatha_num, lines, title, categories):
@@ -167,10 +175,13 @@ def upsert_qdrant(book_id, page_num, chapter, sutra_num, gatha_num, lines, title
     if not valid:
         return 0
     vectors = embed_texts(valid)
-    requests.put(
-        f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}/points",
-        headers=headers,
-        json={"points": [
+    import time
+    for attempt in range(3):
+        try:
+            requests.put(
+                f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}/points",
+                headers=headers,
+                json={"points": [
             {
                 "id": str(uuid.uuid4()), "vector": vectors[j],
                 "payload": {
@@ -189,6 +200,10 @@ def upsert_qdrant(book_id, page_num, chapter, sutra_num, gatha_num, lines, title
         ]},
         timeout=60,
     ).raise_for_status()
+            break
+        except requests.exceptions.RequestException as e:
+            if attempt == 2: raise e
+            time.sleep(2)
     return len(valid)
 
 
@@ -199,16 +214,22 @@ def raw_url(path: str) -> str:
     return f"{REPO_RAW}/{encoded}"
 
 
-def fetch_raw(path: str) -> str | None:
+def fetch_raw(path: str, retries=3) -> str | None:
     """Fetch text content from raw GitHub URL. Returns None on 404."""
-    try:
-        r = requests.get(raw_url(path), timeout=15)
-        if r.status_code == 404:
-            return None
-        r.raise_for_status()
-        return r.text
-    except Exception:
-        return None
+    import time
+    for attempt in range(retries):
+        try:
+            r = requests.get(raw_url(path), timeout=15)
+            if r.status_code == 404:
+                return None
+            r.raise_for_status()
+            return r.text
+        except Exception as e:
+            if attempt == retries - 1:
+                print(f"fetch_raw error: {e}")
+                return None
+            time.sleep(2)
+    return None
 
 
 # Hard-coded scripture catalog (discovered from repo, avoids API rate limits)
@@ -296,16 +317,16 @@ def get_html_files(scripture_path: str) -> list:
             # File doesn't exist — scripture uses chapter-sutra naming (e.g. 01-01.html)
             # Fall through to chapter-sutra enumeration below
 
-    # Chapter-sutra enumeration (01-01.html, 01-02.html, ...)
+    # Chapter-sutra enumeration fallback (using GitHub API)
     files = []
-    for ch in range(1, 15):
-        for su in range(1, 200):
-            fname = f"{ch:02d}-{su:02d}.html"
-            probe = fetch_raw(f"{scripture_path}/html/{fname}")
-            if probe and "<html" in probe.lower():
-                files.append(fname)
-            elif probe is None:
-                break  # no more sutras in this chapter
+    enc_path = "/".join(quote(p, safe="") for p in scripture_path.split("/"))
+    api_url = f"https://api.github.com/repos/nikkyjain/nikkyjain.github.io/contents/{enc_path}/html"
+    try:
+        r = requests.get(api_url, timeout=15)
+        if r.status_code == 200:
+            return sorted([i["name"] for i in r.json() if i["name"].endswith(".html")])
+    except Exception as e:
+        print(f"API list error: {e}")
     return sorted(files)
 
 
@@ -333,16 +354,21 @@ def import_scripture(scripture: dict, skip_if_done: bool = False) -> dict:
     # Get or create Firestore doc
     if book_id:
         doc_ref = db.collection("scriptures").document(book_id)
-        existing = doc_ref.get().to_dict() or {}
-        if skip_if_done and existing.get("status") == "ready" and existing.get("source") == "github-import":
-            print(f"  ↺ Skip (already imported): {title}")
-            return {"skipped": True}
     else:
-        # Create new doc
-        doc_ref = db.collection("scriptures").document()
-        book_id = doc_ref.id
-        scripture["book_id"] = book_id
-        existing = {}
+        docs = list(db.collection("scriptures").where("title", "==", title).limit(1).stream())
+        if docs:
+            doc_ref = docs[0].reference
+            book_id = doc_ref.id
+            scripture["book_id"] = book_id
+        else:
+            doc_ref = db.collection("scriptures").document()
+            book_id = doc_ref.id
+            scripture["book_id"] = book_id
+
+    existing = doc_ref.get().to_dict() or {}
+    if skip_if_done and existing.get("status") == "ready" and existing.get("source") == "github-import":
+        print(f"  ↺ Skip (already imported): {title}")
+        return {"skipped": True}
 
     print(f"\n{'═'*60}")
     print(f"  Importing: {title}")

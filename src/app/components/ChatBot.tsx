@@ -231,7 +231,7 @@ export default function ChatBot() {
     recognitionRef.current = rec;
     rec.lang = "hi-IN";          // hi-IN handles both Hindi and English queries
     rec.interimResults = true;
-    rec.continuous = false;
+    rec.continuous = true;
     rec.onstart = () => setIsListening(true);
     rec.onresult = (e: any) => {
       const transcript = Array.from(e.results as SpeechRecognitionResultList)
@@ -396,7 +396,9 @@ export default function ChatBot() {
             >
               <option value="">All Scriptures</option>
               {scriptures.map((s) => (
-                <option key={s.id} value={s.id}>{s.title}</option>
+                <option key={s.id} value={s.id}>
+                  {s.title === "तत्त्वार्थसूत्र" ? "तत्त्वार्थसूत्र (Tatvarthsutra)" : s.title}
+                </option>
               ))}
             </select>
           </div>
