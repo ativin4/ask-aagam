@@ -10,6 +10,7 @@ interface Bhajan {
   title: string;
   lyrics: string;
   category: string;
+  categories?: string[];
   slug: string;
   writer?: string;
   meaning?: string;
@@ -32,7 +33,8 @@ export async function generateMetadata({
 
   const firstLine = bhajan.lyrics.split("\n").find((l) => l.trim()) || "";
   const writerPart = bhajan.writer ? ` By ${bhajan.writer}.` : "";
-  const description = `${bhajan.title} — Jain bhajan lyrics (${bhajan.category}).${writerPart} ${firstLine}`.slice(0, 160);
+  const categoryLabel = bhajan.categories?.length ? bhajan.categories.join(", ") : bhajan.category;
+  const description = `${bhajan.title} — Jain bhajan lyrics (${categoryLabel}).${writerPart} ${firstLine}`.slice(0, 160);
 
   return {
     title: `${bhajan.title} Jain Bhajan Lyrics | Ask Aagam`,
@@ -61,6 +63,8 @@ export default async function BhajanPage({
   const bhajan = await getBhajan(slug);
   if (!bhajan) notFound();
 
+  const categories = bhajan.categories?.length ? bhajan.categories : [bhajan.category];
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "MusicComposition",
@@ -82,13 +86,20 @@ export default async function BhajanPage({
           All Bhajans
         </Link>
         <span className="text-gray-300 dark:text-gray-600">/</span>
-        <span className="text-gray-500 dark:text-gray-400">{bhajan.category}</span>
+        <span className="text-gray-500 dark:text-gray-400">{categories.join(", ")}</span>
       </nav>
 
       <div className="mb-6">
-        <span className="inline-block text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300 mb-3">
-          {bhajan.category}
-        </span>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {categories.map((cat) => (
+            <span
+              key={cat}
+              className="inline-block text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+            >
+              {cat}
+            </span>
+          ))}
+        </div>
         <h1 className="text-3xl sm:text-4xl font-bold" style={{ fontFamily: "var(--font-devanagari)" }}>
           {bhajan.title}
         </h1>
@@ -121,7 +132,7 @@ export default async function BhajanPage({
       )}
 
       <p className="text-xs text-gray-400 dark:text-gray-600 mt-6">
-        Jain Bhajan · {bhajan.category}
+        Jain Bhajan · {categories.join(", ")}
       </p>
 
       <CommentSection slug={bhajan.slug} />

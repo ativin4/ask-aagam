@@ -16,10 +16,11 @@ interface BhajanEntry {
   slug: string;
   title: string;
   category: string;
+  categories?: string[];
 }
 
 async function getAllBhajans(): Promise<BhajanEntry[]> {
-  const snapshot = await adminDb.collection("bhajans").select("title", "category", "slug").get();
+  const snapshot = await adminDb.collection("bhajans").select("title", "category", "categories", "slug").get();
   return snapshot.docs.map((doc) => doc.data() as BhajanEntry);
 }
 
@@ -27,7 +28,10 @@ export default async function BhajansIndexPage() {
   const bhajans = await getAllBhajans();
 
   const byCategory = bhajans.reduce<Record<string, BhajanEntry[]>>((acc, b) => {
-    (acc[b.category] ??= []).push(b);
+    const cats = b.categories?.length ? b.categories : [b.category];
+    for (const cat of cats) {
+      (acc[cat] ??= []).push(b);
+    }
     return acc;
   }, {});
 
