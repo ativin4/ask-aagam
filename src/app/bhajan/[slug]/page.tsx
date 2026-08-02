@@ -29,22 +29,23 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const bhajan = await getBhajan(slug);
-  if (!bhajan) return { title: "Bhajan Not Found | Ask Aagam" };
+  if (!bhajan) return { title: "Bhajan Not Found" };
 
   const firstLine = bhajan.lyrics.split("\n").find((l) => l.trim()) || "";
   const writerPart = bhajan.writer ? ` By ${bhajan.writer}.` : "";
   const categoryLabel = bhajan.categories?.length ? bhajan.categories.join(", ") : bhajan.category;
   const description = `${bhajan.title} — Jain bhajan lyrics (${categoryLabel}).${writerPart} ${firstLine}`.slice(0, 160);
+  const canonical = `https://ask-aagam.vercel.app/bhajan/${encodeURIComponent(bhajan.slug)}`;
 
   return {
-    title: `${bhajan.title} Jain Bhajan Lyrics | Ask Aagam`,
+    title: `${bhajan.title} Jain Bhajan Lyrics`,
     description,
-    alternates: { canonical: `https://ask-aagam.vercel.app/bhajan/${bhajan.slug}` },
+    alternates: { canonical },
     openGraph: {
       title: `${bhajan.title} — Jain Bhajan Lyrics`,
       description,
       type: "article",
-      url: `https://ask-aagam.vercel.app/bhajan/${bhajan.slug}`,
+      url: canonical,
     },
     twitter: {
       card: "summary",
@@ -69,9 +70,11 @@ export default async function BhajanPage({
     "@context": "https://schema.org",
     "@type": "MusicComposition",
     name: bhajan.title,
+    url: `https://ask-aagam.vercel.app/bhajan/${encodeURIComponent(bhajan.slug)}`,
     genre: "Jain Bhajan",
     inLanguage: "hi",
     lyrics: { "@type": "CreativeWork", text: bhajan.lyrics },
+    isPartOf: { "@type": "CollectionPage", name: "Jain Bhajans", url: "https://ask-aagam.vercel.app/bhajans" },
     ...(bhajan.writer ? { composer: { "@type": "Person", name: bhajan.writer } } : {}),
   };
 

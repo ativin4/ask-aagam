@@ -6,7 +6,7 @@ import BhajanSearchBox from "../components/BhajanSearchBox";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Jain Bhajans — Lyrics Collection | Ask Aagam",
+  title: "Jain Bhajans — Lyrics Collection",
   description:
     "Browse Jain bhajan lyrics by category — Dev, Shastra, Guru, Dharma, Tirth and more. Read and search Jain devotional songs.",
   alternates: { canonical: "https://ask-aagam.vercel.app/bhajans" },

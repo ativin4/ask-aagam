@@ -1,51 +1,30 @@
-"use client";
+import type { Metadata } from "next";
+import Link from "next/link";
+import HomeApp from "./components/HomeApp";
 
-import { useState, useEffect } from "react";
-import { auth } from "../../lib/firebase";
-import { onAuthStateChanged, User } from "firebase/auth";
-import Header from "./components/Header";
-import ScriptureReader from "./components/ScriptureReader";
-import ChatBot from "./components/ChatBot";
+export const metadata: Metadata = {
+  title: { absolute: "Ask Aagam | Jain Scriptures, Aagams & Bhajans" },
+  description:
+    "Read and explore Jain scriptures, Aagams, and bhajan lyrics with Ask Aagam's searchable digital library.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Ask Aagam — Jain Scriptures, Aagams & Bhajans",
+    description:
+      "Read and explore Jain scriptures, Aagams, and bhajan lyrics in a searchable digital library.",
+    url: "/",
+  },
+};
 
 export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isMaintainer, setIsMaintainer] = useState(false);
-  const [showIosHint, setShowIosHint] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        const tokenResult = await currentUser.getIdTokenResult(true);
-        setIsMaintainer(!!tokenResult.claims.maintainer);
-      } else {
-        setIsMaintainer(false);
-      }
-      setAuthLoading(false);
-    });
-
-    // Check if running on iOS and not in standalone mode
-    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream: unknown }).MSStream;
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    if (isIos && !isStandalone) {
-      setTimeout(() => setShowIosHint(true), 0);
-    }
-
-    return () => unsubscribe();
-  }, []);
-
   return (
-    <main className="p-3 sm:p-8 font-sans max-w-5xl mx-auto">
-      {showIosHint && (
-        <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded mb-6 text-sm">
-          <p className="font-semibold mb-1">Install App on iOS</p>
-          <p>Tap the Share button <span className="text-lg leading-none">⎋</span> and select <strong>Add to Home Screen</strong> for the best reading experience.</p>
-        </div>
-      )}
-      <Header user={user} isMaintainer={isMaintainer} isLoading={authLoading} />
-      <ScriptureReader isMaintainer={isMaintainer} />
-      <ChatBot />
-    </main>
+    <HomeApp>
+      <section className="mb-6 max-w-3xl">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Jain Scriptures, Aagams &amp; Bhajans</h1>
+        <p className="mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+          Ask Aagam is a digital library for reading and exploring Jain scriptures, with searchable text and a collection of Jain bhajan lyrics.
+          Start with the library below or browse the <Link href="/bhajans" className="text-blue-600 dark:text-blue-400 hover:underline">Jain bhajans</Link>.
+        </p>
+      </section>
+    </HomeApp>
   );
 }

@@ -4,6 +4,9 @@ import "./globals.css";
 import ServiceWorkerRegister from './components/ServiceWorkerRegister';
 import { Analytics } from "@vercel/analytics/next";
 
+const siteUrl = new URL("https://ask-aagam.vercel.app");
+const siteDescription = "Read and explore Jain scriptures, Aagams, and bhajan lyrics with Ask Aagam's searchable digital library.";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -30,9 +33,42 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Ask Aagam",
-  description: "For reading and understanding jain scriptures",
-  manifest: "/manifest.json",
+  metadataBase: siteUrl,
+  title: {
+    default: "Ask Aagam | Jain Scriptures & Bhajans",
+    template: "%s | Ask Aagam",
+  },
+  description: siteDescription,
+  applicationName: "Ask Aagam",
+  keywords: ["Jain scriptures", "Jain Aagams", "Jain bhajans", "Jainism", "Jain library"],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "en_IN",
+    url: "/",
+    siteName: "Ask Aagam",
+    title: "Ask Aagam | Jain Scriptures & Bhajans",
+    description: siteDescription,
+    images: [{ url: "/icon-512.png", width: 512, height: 512, alt: "Ask Aagam" }],
+  },
+  twitter: {
+    card: "summary",
+    title: "Ask Aagam | Jain Scriptures & Bhajans",
+    description: siteDescription,
+    images: ["/icon-512.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -59,6 +95,19 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${notoDevanagari.variable} antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "Ask Aagam",
+              url: siteUrl.href,
+              description: siteDescription,
+              inLanguage: ["en", "hi"],
+            }),
+          }}
+        />
         <ServiceWorkerRegister />
         <Analytics />
         {children}
