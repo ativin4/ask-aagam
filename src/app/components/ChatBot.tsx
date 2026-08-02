@@ -24,6 +24,31 @@ interface Message {
   isStreaming?: boolean;
 }
 
+interface RecognitionResultLike {
+  isFinal: boolean;
+  0: { transcript: string };
+}
+
+interface RecognitionEventLike {
+  resultIndex: number;
+  results: ArrayLike<RecognitionResultLike>;
+}
+
+interface RecognitionInstance {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onstart: (() => void) | null;
+  onresult: ((event: RecognitionEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+type RecognitionConstructor = new () => RecognitionInstance;
+
 const SUGGESTED = [
   "What are the 5 types of jiva bhavas?",
   "How does karma bind to the soul according to Tattvartha Sutra?",
@@ -50,6 +75,30 @@ function cleanForSpeech(text: string): string {
     .trim();
 }
 
+function splitForSpeech(text: string, maxChars = 320): string[] {
+  const sentences = cleanForSpeech(text).split(/(?<=[.!?।॥])\s+/).filter(Boolean);
+  const chunks: string[] = [];
+  let current = "";
+  for (const sentence of sentences) {
+    if (sentence.length > maxChars) {
+      if (current) chunks.push(current);
+      for (let start = 0; start < sentence.length; start += maxChars) {
+        chunks.push(sentence.slice(start, start + maxChars));
+      }
+      current = "";
+    } else if (!current) {
+      current = sentence;
+    } else if (current.length + sentence.length + 1 <= maxChars) {
+      current += ` ${sentence}`;
+    } else {
+      chunks.push(current);
+      current = sentence;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
 export default function ChatBot() {
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -65,7 +114,10 @@ export default function ChatBot() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<RecognitionInstance | null>(null);
+  const recognitionBaseRef = useRef("");
+  const speechRunRef = useRef(0);
+  const speechTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -162,12 +214,12 @@ export default function ChatBot() {
       setMessages((prev) =>
         prev.map((m) => m.id === asstId ? { ...m, isStreaming: false, citations } : m)
       );
-    } catch (err: any) {
-      if (err.name === "AbortError") return;
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setMessages((prev) =>
         prev.map((m) =>
           m.id === asstId
-            ? { ...m, content: err.message || "Something went wrong. Please try again.", isStreaming: false }
+            ? { ...m, content: err instanceof Error ? err.message : "Something went wrong. Please try again.", isStreaming: false }
             : m
         )
       );
@@ -202,19 +254,50 @@ export default function ChatBot() {
   // ── TTS (Web Speech API) ──────────────────────────────────────────────────
   const speak = useCallback((text: string, msgId: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const chunks = splitForSpeech(text);
+    if (!chunks.length) return;
+
+    // Web Speech can retain a cancelled utterance in its queue on Chrome. A
+    // generation token and one-at-a-time chunks prevent that stale utterance
+    // from restarting or repeating a response.
+    const run = speechRunRef.current + 1;
+    speechRunRef.current = run;
+    if (speechTimerRef.current !== null) window.clearTimeout(speechTimerRef.current);
     window.speechSynthesis.cancel();
-    const clean = cleanForSpeech(text);
-    if (!clean) return;
-    const utter = new SpeechSynthesisUtterance(clean);
-    utter.lang = detectLang(clean);
-    utter.rate = 0.9;
-    utter.onstart = () => setSpeakingId(msgId);
-    utter.onend = () => setSpeakingId(null);
-    utter.onerror = () => setSpeakingId(null);
-    window.speechSynthesis.speak(utter);
+
+    const speakChunk = (index: number) => {
+      if (speechRunRef.current !== run) return;
+      if (index >= chunks.length) {
+        setSpeakingId((current) => current === msgId ? null : current);
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(chunks[index]);
+      utterance.lang = detectLang(chunks[index]);
+      utterance.rate = 0.9;
+      utterance.onstart = () => {
+        if (speechRunRef.current === run) setSpeakingId(msgId);
+      };
+      utterance.onend = () => {
+        if (speechRunRef.current === run) {
+          speechTimerRef.current = window.setTimeout(() => speakChunk(index + 1), 0);
+        }
+      };
+      utterance.onerror = () => {
+        if (speechRunRef.current === run) setSpeakingId(null);
+      };
+      window.speechSynthesis.speak(utterance);
+    };
+
+    // Give cancellation a turn to clear the browser's internal queue.
+    speechTimerRef.current = window.setTimeout(() => speakChunk(0), 50);
   }, []);
 
   const stopSpeaking = useCallback(() => {
+    speechRunRef.current += 1;
+    if (speechTimerRef.current !== null) {
+      window.clearTimeout(speechTimerRef.current);
+      speechTimerRef.current = null;
+    }
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
@@ -224,20 +307,32 @@ export default function ChatBot() {
   // ── STT (Web Speech API) ──────────────────────────────────────────────────
   const startListening = useCallback(() => {
     if (typeof window === "undefined") return;
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const speechWindow = window as Window & {
+      SpeechRecognition?: RecognitionConstructor;
+      webkitSpeechRecognition?: RecognitionConstructor;
+    };
+    const SR = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!SR) { alert("Voice input not supported in this browser. Use Chrome."); return; }
     stopSpeaking();
     const rec = new SR();
     recognitionRef.current = rec;
-    rec.lang = "hi-IN";          // hi-IN handles both Hindi and English queries
+    recognitionBaseRef.current = input.trim() ? `${input.trim()} ` : "";
+    // Chrome does not provide reliable automatic language detection. Preserve
+    // a Devanagari draft as Hindi; otherwise use Indian English for clearer
+    // English/Hinglish recognition.
+    rec.lang = detectLang(input) === "hi-IN" ? "hi-IN" : "en-IN";
     rec.interimResults = true;
-    rec.continuous = true;
+    rec.continuous = false;
     rec.onstart = () => setIsListening(true);
-    rec.onresult = (e: any) => {
-      const transcript = Array.from(e.results as SpeechRecognitionResultList)
-        .map((r: SpeechRecognitionResult) => r[0].transcript)
-        .join("");
-      setInput(transcript);
+    const fragments: string[] = [];
+    rec.onresult = (event) => {
+      // resultIndex identifies only the changed portion. Reconstructing from
+      // it avoids appending the same finalized phrase on every interim event.
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        fragments[index] = event.results[index][0]?.transcript ?? "";
+      }
+      const transcript = fragments.join("").replace(/\s+/g, " ").trim();
+      setInput(`${recognitionBaseRef.current}${transcript}`.trimStart());
       if (inputRef.current) {
         inputRef.current.style.height = "auto";
         inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + "px";
@@ -245,17 +340,28 @@ export default function ChatBot() {
     };
     rec.onend = () => {
       setIsListening(false);
-      recognitionRef.current = null;
+      if (recognitionRef.current === rec) recognitionRef.current = null;
       // Focus input so user can review + press Enter to send
       setTimeout(() => inputRef.current?.focus(), 100);
     };
-    rec.onerror = () => { setIsListening(false); recognitionRef.current = null; };
+    rec.onerror = () => {
+      setIsListening(false);
+      if (recognitionRef.current === rec) recognitionRef.current = null;
+    };
     rec.start();
-  }, [stopSpeaking]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [input, stopSpeaking]);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
     setIsListening(false);
+  }, []);
+
+  useEffect(() => () => {
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    speechRunRef.current += 1;
+    if (speechTimerRef.current !== null) window.clearTimeout(speechTimerRef.current);
+    window.speechSynthesis?.cancel();
   }, []);
 
   // ── Panel geometry (JS-driven — Tailwind JIT can't scan dynamic strings) ──

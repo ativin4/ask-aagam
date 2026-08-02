@@ -5,7 +5,7 @@
  * for specialized Jain terms that rarely appear together in training data.
  */
 
-// [english, ...sanskrit/hindi synonyms]
+// [english, ...sanskrit/hindi/romanized synonyms]
 const GLOSSARY: [string, ...string[]][] = [
   // Core philosophy
   ["non-violence", "ahimsa", "अहिंसा"],
@@ -66,7 +66,7 @@ const GLOSSARY: [string, ...string[]][] = [
   ["five senses", "panch indriya", "पंच इंद्रिय"],
 
   // Philosophy
-  ["non-absolutism", "anekantavada", "अनेकान्तवाद", "syadvada", "स्याद्वाद"],
+  ["non-absolutism", "anekantavada", "anekant", "अनेकान्तवाद", "अनेकांतवाद"],
   ["conditional predication", "syadvada", "स्याद्वाद", "saptabhangi", "सप्तभंगी"],
   ["substance", "dravya", "dravyas", "द्रव्य"],
   ["quality", "guna", "gun", "गुण"],
@@ -93,7 +93,54 @@ const GLOSSARY: [string, ...string[]][] = [
   // Dravyas
   ["six substances", "shadravya", "षद्द्रव्य", "dharma", "adharma", "pudgal", "पुद्गल",
    "akasha", "आकाश", "kala", "काल"],
+
+  // Frequently asked Jain philosophical frameworks
+  ["seven tattvas", "sapta tattva", "seven principles", "जीव", "अजीव", "आस्रव", "बन्ध", "संवर", "निर्जरा", "मोक्ष"],
+  ["nine tattvas", "nava tattva", "nine principles", "पुण्य", "पाप", "जीव", "अजीव", "आस्रव", "बन्ध", "संवर", "निर्जरा", "मोक्ष"],
+  ["fourteen marganas", "margana", "मार्गणा", "fourteen investigations"],
+  ["leshyas", "leshya", "लेश्या", "six leshyas"],
+  ["four destinies", "gati", "गतियाँ", "नरक", "तिर्यंच", "मनुष्य", "देव"],
+  ["five supreme beings", "panch parameshthi", "पंच परमेष्ठी", "arihant", "siddha", "acharya", "upadhyaya", "sadhu"],
+  ["four passions", "four kashayas", "चार कषाय", "krodha", "mana", "maya", "lobha"],
+  ["twelve reflections", "anupreksha", "बारह भावना", "अनुप्रेक्षा"],
+  ["twelve vows", "twelve vratas", "बारह व्रत", "महाव्रत", "अणुव्रत", "शिक्षाव्रत"],
 ];
+
+const MAX_EXPANSION_TERMS = 28;
+
+function matchesTerm(query: string, normalizedQuery: string, term: string): boolean {
+  const normalizedTerm = term.toLowerCase().trim();
+  if (!normalizedTerm) return false;
+
+  // Word boundaries prevent short Romanized terms such as "gun" from matching
+  // unrelated English words. They do not work reliably for Devanagari, where a
+  // direct substring match is the appropriate behaviour.
+  if (/^[a-z0-9\s-]+$/i.test(normalizedTerm)) {
+    const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`, "i").test(normalizedQuery);
+  }
+  return query.includes(term);
+}
+
+/**
+ * Returns a small set of focused alternate queries. A single embedding of a
+ * huge synonym list blurs closely related Jain doctrines, so the chat route
+ * searches the original question as well as one focused doctrinal formulation.
+ */
+export function buildJainSearchQueries(query: string): string[] {
+  const normalized = query.toLowerCase();
+  const matchedConcepts = GLOSSARY.filter((entry) =>
+    entry.some((term) => matchesTerm(query, normalized, term))
+  );
+
+  const queries = [query.trim()];
+  for (const entry of matchedConcepts.slice(0, 3)) {
+    const terms = entry.slice(0, 7).join(" ");
+    queries.push(`Jain philosophy ${terms}`);
+  }
+
+  return [...new Set(queries.filter(Boolean))];
+}
 
 /**
  * Expands a query with Jain terminology synonyms across languages.
@@ -105,14 +152,16 @@ export function expandJainQuery(query: string): string {
   const additions = new Set<string>();
 
   for (const entry of GLOSSARY) {
-    const matched = entry.some((term) => lower.includes(term.toLowerCase()));
+    const matched = entry.some((term) => matchesTerm(query, lower, term));
     if (matched) {
       for (const term of entry) {
-        if (!lower.includes(term.toLowerCase())) {
+        if (!matchesTerm(query, lower, term)) {
           additions.add(term);
+          if (additions.size >= MAX_EXPANSION_TERMS) break;
         }
       }
     }
+    if (additions.size >= MAX_EXPANSION_TERMS) break;
   }
 
   if (additions.size === 0) return query;

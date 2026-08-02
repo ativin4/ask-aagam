@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import * as admin from "firebase-admin";
+import {
+  buildScripturePassages,
+  extractChapterNumber,
+  extractGathaRange,
+} from "../../../../../../../../lib/scripturePassages";
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -16,22 +21,27 @@ const db = admin.firestore();
 const HF_API = "https://router.huggingface.co/hf-inference/models/intfloat/multilingual-e5-large";
 const QDRANT_COLLECTION = "scripture_pages";
 
-async function embedText(text: string): Promise<number[]> {
+async function embedTexts(texts: string[]): Promise<number[][]> {
   const res = await fetch(HF_API, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.HF_TOKEN}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ inputs: `passage: ${text}` }),
+    body: JSON.stringify({ inputs: texts.map((text) => `passage: ${text}`) }),
   });
   if (!res.ok) throw new Error(`HF embed failed (${res.status}): ${await res.text()}`);
-  const data = await res.json();
-  return Array.isArray(data[0]) ? data[0] : data;
+  const data: unknown = await res.json();
+  if (!Array.isArray(data)) throw new Error("Embedding service returned an unexpected response");
+  const vectors: unknown[] = Array.isArray(data[0]) ? data : [data];
+  if (!vectors.every((vector) => Array.isArray(vector) && vector.every((value) => typeof value === "number"))) {
+    throw new Error("Embedding service returned an unexpected vector format");
+  }
+  return vectors as number[][];
 }
 
 async function ensureQdrantIndex(field: string, schema: "integer" | "keyword") {
-  await fetch(
+  const res = await fetch(
     `${process.env.QDRANT_URL}/collections/${QDRANT_COLLECTION}/index`,
     {
       method: "PUT",
@@ -39,35 +49,89 @@ async function ensureQdrantIndex(field: string, schema: "integer" | "keyword") {
       body: JSON.stringify({ field_name: field, field_schema: schema }),
     }
   );
+  if (!res.ok) throw new Error(`Qdrant index failed: ${await res.text()}`);
 }
 
-async function replaceQdrantPage(bookId: string, pageNumber: number, vector: number[], preview: string, bookTitle: string, categories: string[]) {
-  await ensureQdrantIndex("page_number", "integer");
-  // Scroll to find existing point IDs for this page
-  const scrollRes = await fetch(
-    `${process.env.QDRANT_URL}/collections/${QDRANT_COLLECTION}/points/scroll`,
-    {
-      method: "POST",
-      headers: { "api-key": process.env.QDRANT_API_KEY!, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        filter: {
-          must: [
+interface IndexedPassage {
+  text: string;
+  paraNumber: number;
+  vector: number[];
+  chapterNumber?: number;
+  gathaNumber?: string;
+  gathaRange?: string;
+}
+
+async function oldPagePointIds(bookId: string, pageNumber: number): Promise<string[]> {
+  const ids: string[] = [];
+  let offset: string | number | undefined;
+  do {
+    const scrollRes = await fetch(
+      `${process.env.QDRANT_URL}/collections/${QDRANT_COLLECTION}/points/scroll`,
+      {
+        method: "POST",
+        headers: { "api-key": process.env.QDRANT_API_KEY!, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filter: { must: [
             { key: "book_id", match: { value: bookId } },
             { key: "page_number", match: { value: pageNumber } },
-          ],
-        },
-        with_payload: false,
-        limit: 10,
+          ] },
+          with_payload: false,
+          limit: 256,
+          ...(offset !== undefined ? { offset } : {}),
+        }),
+      }
+    );
+    if (!scrollRes.ok) throw new Error(`Qdrant scroll failed: ${await scrollRes.text()}`);
+    const { result } = await scrollRes.json() as { result: { points: Array<{ id: string }>; next_page_offset?: string | number } };
+    ids.push(...result.points.map((point) => point.id));
+    offset = result.next_page_offset;
+  } while (offset !== undefined && offset !== null);
+  return ids;
+}
+
+async function replaceQdrantPage(
+  bookId: string,
+  pageNumber: number,
+  passages: IndexedPassage[],
+  bookTitle: string,
+  categories: string[]
+) {
+  await Promise.all([
+    ensureQdrantIndex("page_number", "integer"),
+    ensureQdrantIndex("para_number", "integer"),
+  ]);
+  const oldIds = await oldPagePointIds(bookId, pageNumber);
+  const upsertRes = await fetch(
+    `${process.env.QDRANT_URL}/collections/${QDRANT_COLLECTION}/points`,
+    {
+      method: "PUT",
+      headers: { "api-key": process.env.QDRANT_API_KEY!, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        points: passages.map((passage) => ({
+          id: crypto.randomUUID(),
+          vector: passage.vector,
+          payload: {
+            book_id: bookId,
+            book_title: bookTitle,
+            page_number: pageNumber,
+            para_number: passage.paraNumber,
+            paragraph_number: passage.paraNumber,
+            categories,
+            preview: passage.text.slice(0, 1200),
+            ...(passage.chapterNumber ? { chapter_number: passage.chapterNumber } : {}),
+            ...(passage.gathaNumber ? { gatha_number: passage.gathaNumber } : {}),
+            ...(passage.gathaRange ? { gatha_range: passage.gathaRange } : {}),
+          },
+        })),
       }),
     }
   );
-  if (!scrollRes.ok) throw new Error(`Qdrant scroll failed: ${await scrollRes.text()}`);
-  const { result } = await scrollRes.json();
-  const oldIds: string[] = result.points.map((p: { id: string }) => p.id);
+  if (!upsertRes.ok) throw new Error(`Qdrant upsert failed: ${await upsertRes.text()}`);
 
-  // Delete old points
+  // Upsert new passages before deleting old ones. A transient embedding/Qdrant
+  // failure can therefore never make an edited page disappear from search.
   if (oldIds.length) {
-    const delRes = await fetch(
+    const deleteRes = await fetch(
       `${process.env.QDRANT_URL}/collections/${QDRANT_COLLECTION}/points/delete`,
       {
         method: "POST",
@@ -75,26 +139,8 @@ async function replaceQdrantPage(bookId: string, pageNumber: number, vector: num
         body: JSON.stringify({ points: oldIds }),
       }
     );
-    if (!delRes.ok) throw new Error(`Qdrant delete failed: ${await delRes.text()}`);
+    if (!deleteRes.ok) throw new Error(`Qdrant cleanup failed: ${await deleteRes.text()}`);
   }
-
-  // Insert new point
-  const newId = crypto.randomUUID();
-  const upsertRes = await fetch(
-    `${process.env.QDRANT_URL}/collections/${QDRANT_COLLECTION}/points`,
-    {
-      method: "PUT",
-      headers: { "api-key": process.env.QDRANT_API_KEY!, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        points: [{
-          id: newId,
-          vector,
-          payload: { book_id: bookId, book_title: bookTitle, page_number: pageNumber, categories, preview },
-        }],
-      }),
-    }
-  );
-  if (!upsertRes.ok) throw new Error(`Qdrant upsert failed: ${await upsertRes.text()}`);
 }
 
 export const dynamic = "force-dynamic";
@@ -116,7 +162,15 @@ export async function POST(
     if (decoded.maintainer !== true) return NextResponse.json({ error: "Forbidden: Maintainers only" }, { status: 403 });
 
     const { lines, note } = await request.json();
-    if (!Array.isArray(lines)) return NextResponse.json({ error: "lines must be an array" }, { status: 400 });
+    if (!Array.isArray(lines) || !lines.every((line) => typeof line === "string")) {
+      return NextResponse.json({ error: "lines must be an array of strings" }, { status: 400 });
+    }
+    const normalizedLines = lines.map((line) => line.trim());
+    const newText = normalizedLines.join(" ").trim();
+    if (!newText) return NextResponse.json({ error: "a correction cannot be empty" }, { status: 400 });
+    if (newText.length > 500_000) {
+      return NextResponse.json({ error: "corrected page is too large" }, { status: 400 });
+    }
 
     // Fetch current page text (for corrections record) and scripture metadata
     const [pageSnap, scriptureSnap] = await Promise.all([
@@ -124,23 +178,45 @@ export async function POST(
       db.collection("scriptures").doc(bookId).get(),
     ]);
 
-    const oldLines: string[] = pageSnap.exists ? (pageSnap.data()?.lines ?? []) : [];
+    const pageData = pageSnap.data() ?? {};
+    const oldLines: string[] = pageSnap.exists ? (pageData.lines ?? []) : [];
     const scriptureData = scriptureSnap.data() ?? {};
     const bookTitle: string = scriptureData.title ?? bookId;
     const categories: string[] = scriptureData.categories ?? [];
 
-    const newText = lines.join(" ");
-    const preview = newText.slice(0, 400);
+    const passages = buildScripturePassages(normalizedLines);
+    if (!passages.length) return NextResponse.json({ error: "no indexable scripture text found" }, { status: 400 });
+    if (passages.length > 64) {
+      return NextResponse.json({ error: "corrected page produces too many passages; split it into smaller pages first" }, { status: 400 });
+    }
 
-    // 1. Embed new text
-    const vector = await embedText(newText);
+    // 1. Embed paragraph-sized passages rather than one page-wide vector. This
+    // makes a correction immediately useful for precise philosophical queries.
+    const vectors = await embedTexts(passages.map((passage) => passage.text));
+    const indexedPassages = passages.map((passage, index) => {
+      const extractedChapter = extractChapterNumber(passage.text);
+      const gatha = extractGathaRange(passage.text);
+      return {
+        ...passage,
+        vector: vectors[index],
+        chapterNumber: extractedChapter ?? pageData.chapterNumber,
+        gathaNumber: gatha.first ?? (pageData.sutraNumber ? String(pageData.sutraNumber) : undefined),
+        gathaRange: gatha.range,
+      };
+    });
 
-    // 2. Update Qdrant (fail fast — Firestore update only after this succeeds)
-    await replaceQdrantPage(bookId, pageNumber, vector, preview, bookTitle, categories);
+    // 2. Upsert new points before old points are removed, then update Firestore.
+    await replaceQdrantPage(bookId, pageNumber, indexedPassages, bookTitle, categories);
 
     // 3. Update Firestore page
     await db.collection("scriptures").doc(bookId).collection("pages").doc(String(pageNumber)).set(
-      { pageNumber, lines, correctedAt: admin.firestore.FieldValue.serverTimestamp() },
+      {
+        pageNumber,
+        lines: normalizedLines,
+        passageCount: indexedPassages.length,
+        indexingVersion: 2,
+        correctedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
       { merge: true }
     );
 
@@ -159,8 +235,8 @@ export async function POST(
     }
 
     return NextResponse.json({ ok: true, pageNumber });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[OCR Correct]", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to save correction" }, { status: 500 });
   }
 }

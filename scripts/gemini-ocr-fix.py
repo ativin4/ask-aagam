@@ -238,18 +238,44 @@ def ocr_page_with_quality(img_path: Path) -> tuple[str, bool]:
 
 
 # ── Qdrant ────────────────────────────────────────────────────────────────────
-def _split_paragraphs(lines):
-    result, para, ln = [], 0, 0
+def _split_paragraphs(lines, max_chars=900):
+    """Create paragraph-sized semantic passages instead of one vector per OCR line."""
+    blocks, pending = [], []
+
+    def flush_block():
+        nonlocal pending
+        text = " ".join(pending).strip()
+        if text:
+            blocks.append(text)
+        pending = []
+
     for raw in lines:
         line = raw.strip()
-        if not line or len(line) < 15:
-            continue
-        result.append((para, ln, line))
-        ln += 1
-        if re.search(r"।{1,2}\d+।{1,2}\s*$", line):
-            para += 1
-            ln = 0
-    return result
+        if line:
+            pending.append(line)
+        else:
+            flush_block()
+    flush_block()
+
+    passages, current = [], ""
+    for block in blocks:
+        # Keep natural sentence/verse boundaries whenever possible.
+        pieces = [p.strip() for p in re.split(r"(?<=[।॥.!?])\s+", block) if p.strip()]
+        for piece in pieces or [block]:
+            if len(piece) > max_chars:
+                if current:
+                    passages.append(current); current = ""
+                passages.extend(piece[i:i + max_chars] for i in range(0, len(piece), max_chars))
+            elif not current:
+                current = piece
+            elif len(current) + len(piece) + 1 <= max_chars:
+                current += " " + piece
+            else:
+                passages.append(current)
+                current = piece
+    if current:
+        passages.append(current)
+    return [(index, 0, text) for index, text in enumerate(passages, start=1) if len(text) >= 15]
 
 
 def embed_texts(texts: list) -> list:
@@ -271,6 +297,13 @@ def replace_qdrant(book_id, page_number, lines, book_title, categories):
             headers=headers,
             json={"field_name": field, "field_schema": "integer"},
         )
+    quads = _split_paragraphs(lines)
+    if not quads:
+        return 0
+    # Embed before touching existing vectors. A failed OCR/embedding pass must
+    # not make a previously searchable scripture page disappear.
+    vectors = embed_texts([q[2] for q in quads])
+
     scroll = requests.post(
         f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}/points/scroll",
         headers=headers,
@@ -281,15 +314,6 @@ def replace_qdrant(book_id, page_number, lines, book_title, categories):
         timeout=30,
     ).json()
     old_ids = [p["id"] for p in scroll.get("result", {}).get("points", [])]
-    if old_ids:
-        requests.post(
-            f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}/points/delete",
-            headers=headers, json={"points": old_ids}, timeout=30,
-        )
-    quads = _split_paragraphs(lines)
-    if not quads:
-        return
-    vectors = embed_texts([q[2] for q in quads])
     requests.put(
         f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}/points",
         headers=headers,
@@ -299,11 +323,18 @@ def replace_qdrant(book_id, page_number, lines, book_title, categories):
                 "book_id": book_id, "book_title": book_title,
                 "categories": categories, "page_number": page_number,
                 "para_number": quads[j][0], "line_number": quads[j][1],
-                "preview": quads[j][2][:400],
+                "paragraph_number": quads[j][0],
+                "preview": quads[j][2][:1200],
             },
         } for j in range(len(quads))]},
         timeout=30,
     ).raise_for_status()
+    if old_ids:
+        requests.post(
+            f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}/points/delete",
+            headers=headers, json={"points": old_ids}, timeout=30,
+        ).raise_for_status()
+    return len(quads)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -425,7 +456,10 @@ def fix_scripture(book_id: str, page_from: int = None, page_to: int = None,
             errors.append((page_num, f"bad: {text[:60]!r}"))
             continue
 
-        lines = [l for l in text.split("\n") if l.strip()]
+        # Blank lines are meaningful paragraph boundaries for semantic indexing.
+        lines = [l.strip() for l in text.split("\n")]
+        while lines and not lines[-1]:
+            lines.pop()
         print(f"ok ({len(lines)} lines)", end="", flush=True)
 
         if dry_run:
@@ -449,8 +483,9 @@ def fix_scripture(book_id: str, page_from: int = None, page_to: int = None,
             }, ensure_ascii=False) + "\n")
             training_out.flush()
 
-            replace_qdrant(book_id, page_num, lines, book_title, categories)
+            passage_count = replace_qdrant(book_id, page_num, lines, book_title, categories)
             fs_data: dict = {"pageNumber": page_num, "lines": lines,
+                             "passageCount": passage_count, "indexingVersion": 2,
                              "patchedAt": _gfs.SERVER_TIMESTAMP}
             if needs_review:
                 fs_data["ocrNeedsReview"] = True

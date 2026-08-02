@@ -9,6 +9,29 @@ Ask Aagam is a dedicated platform for accessing and reading Jain scriptures. It 
 -   **Offline Reading:** Save scriptures directly to your device to read them anytime, even without an internet connection.
 -   **PDF Downloads:** Download scriptures as PDF files for your personal collection.
 -   **PWA Support:** Install the application on your phone or desktop for a native-app-like experience.
+-   **Grounded Jain Q&A:** Multi-query Jain terminology retrieval, source citations, and clearly-labelled scriptural inferences.
+
+## Scripture ingestion and search indexing
+
+Search works best with paragraph-sized passages rather than one vector for an
+entire page. After importing an existing scripture or correcting OCR, rebuild
+its vectors with:
+
+```bash
+python3 scripts/reindex-scriptures.py --book YOUR_FIRESTORE_SCRIPTURE_ID
+```
+
+Use `--from` / `--to` for a page range, or inspect the passages without making
+changes first:
+
+```bash
+python3 scripts/reindex-scriptures.py --book YOUR_FIRESTORE_SCRIPTURE_ID --dry-run
+```
+
+The reindexer keeps page, paragraph, chapter, and gatha metadata, upserts the
+new vectors before removing old ones, and records `indexingVersion: 2` on each
+completed page. The PDF OCR script uses the same paragraph-sized layout for new
+or reprocessed pages.
 
 ## Getting Started
 

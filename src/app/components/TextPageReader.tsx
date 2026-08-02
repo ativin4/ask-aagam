@@ -222,7 +222,10 @@ export default function TextPageReader({
     setSaving(true); setSaveError(null);
     try {
       const token = await user.getIdToken();
-      const lines = editText.split("\n").map((l) => l.trim()).filter(Boolean);
+      // Blank lines carry paragraph boundaries. Preserve them so the ingestion
+      // pipeline can create focused semantic passages instead of one broad page.
+      const lines = editText.split("\n").map((line) => line.trim());
+      while (lines.length && !lines[lines.length - 1]) lines.pop();
       const res = await fetch(
         `/api/scriptures/${scriptureId}/pages/${pages[current].pageNumber}/correct`,
         { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ lines }) }
@@ -307,7 +310,7 @@ export default function TextPageReader({
       {/* ── Content ──────────────────────────────────────────────────────── */}
       {editMode ? (
         <div className="flex-1 flex flex-col min-h-0 p-4 gap-3">
-          <p className="text-xs text-gray-500">One line per paragraph. Save will update Firestore + re-embed.</p>
+          <p className="text-xs text-gray-500">Use blank lines between paragraphs. Save will update Firestore and rebuild searchable passages.</p>
           <textarea
             className="flex-1 border rounded-lg p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
             value={editText}
